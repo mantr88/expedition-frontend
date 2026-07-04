@@ -8,7 +8,12 @@ import { useAuthStore } from '../stores/auth'
 import * as authApi from '../api/auth'
 import type { User } from '../types/User'
 
+import * as channelsApi from '../api/channels'
+import * as messagesApi from '../api/messages'
+
 vi.mock('../api/auth')
+vi.mock('../api/channels')
+vi.mock('../api/messages')
 
 const mockUser: User = {
   id: 1,
@@ -33,6 +38,12 @@ describe('WorkspaceView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.resetAllMocks()
+    vi.mocked(channelsApi.fetchChannels).mockResolvedValue([])
+    vi.mocked(channelsApi.fetchChannelMembers).mockResolvedValue([])
+    vi.mocked(messagesApi.fetchMessages).mockResolvedValue({
+      data: [],
+      meta: { has_more: false, next_cursor: null },
+    })
   })
 
   it('navigates back to login after logout', async () => {
@@ -51,7 +62,7 @@ describe('WorkspaceView', () => {
       global: { plugins: [router] },
     })
 
-    await wrapper.find('button').trigger('click')
+    await wrapper.find('.logout-btn').trigger('click')
     await flushPromises()
 
     expect(authApi.logout).toHaveBeenCalled()
