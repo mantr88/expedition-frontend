@@ -79,5 +79,15 @@ export const useChannelsStore = defineStore('channels', {
         console.error('Failed to load channel members:', err)
       }
     },
+
+    handleChannelUpdated(channel: Channel) {
+      const idx = this.channels.findIndex((c) => c.id === channel.id)
+      if (idx !== -1) {
+        this.channels[idx] = {
+          ...this.channels[idx],
+          ...channel,
+        }
+      }
+    },
   },
 })

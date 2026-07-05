@@ -9,6 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'send', text: string): void
+  (e: 'typing'): void
 }>()
 
 const text = ref('')
@@ -40,6 +41,7 @@ function submit() {
         :disabled="disabled"
         class="message-textarea"
         @keydown="handleKeyDown"
+        @input="emit('typing')"
       ></textarea>
 
       <div class="toolbar">

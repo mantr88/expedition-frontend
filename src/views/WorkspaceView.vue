@@ -1,16 +1,27 @@
 <script setup lang="ts">
-import { onMounted, watch, ref } from 'vue'
+import { onMounted, watch, ref, computed } from 'vue'
 import { useChannelsStore } from '../stores/channels'
 import { useMessagesStore } from '../stores/messages'
+import { usePresenceStore } from '../stores/presence'
+import { useEcho } from '../composables/useEcho'
+import { useTyping } from '../composables/useTyping'
 import ChannelSidebar from '../components/ChannelSidebar.vue'
 import MessageList from '../components/MessageList.vue'
 import MessageInput from '../components/MessageInput.vue'
+import MemberList from '../components/MemberList.vue'
 import { PhHash, PhLock, PhUsers, PhArrowClockwise } from '@phosphor-icons/vue'
 
 const channelsStore = useChannelsStore()
 const messagesStore = useMessagesStore()
+const presenceStore = usePresenceStore()
+
+// Initialize Laravel Echo / Reverb integration
+useEcho()
+
+const { sendTypingWhisper } = useTyping()
 
 const loadingOlder = ref(false)
+const showMembers = ref(false)
 
 onMounted(async () => {
   try {
@@ -86,10 +97,29 @@ async function handleManualRefetch() {
     }
   }
 }
+
+function handleUserTyping() {
+  if (channelsStore.currentChannelId !== null) {
+    sendTypingWhisper(channelsStore.currentChannelId)
+  }
+}
+
+const typingUsers = computed(() => {
+  if (channelsStore.currentChannelId === null) return []
+  return presenceStore.getTypingUsersInChannel(channelsStore.currentChannelId)
+})
+
+const typingText = computed(() => {
+  const users = typingUsers.value
+  if (users.length === 0) return ''
+  if (users.length === 1) return `${users[0].name} пише...`
+  if (users.length === 2) return `${users[0].name} та ${users[1].name} пишуть...`
+  return 'Кілька людей пишуть...'
+})
 </script>
 
 <template>
-  <div class="workspace-layout">
+  <div :class="['workspace-layout', { 'show-members-panel': showMembers }]">
     <!-- Sidebar Panel (260px) -->
     <ChannelSidebar class="layout-sidebar" />
 
@@ -112,10 +142,14 @@ async function handleManualRefetch() {
         </div>
 
         <div class="header-right">
-          <div class="members-badge">
+          <button
+            :class="['members-badge', { active: showMembers }]"
+            aria-label="Показати учасників"
+            @click="showMembers = !showMembers"
+          >
             <PhUsers :size="18" />
             <span class="mono">{{ channelsStore.activeChannel.members_count }}</span>
-          </div>
+          </button>
 
           <button
             class="refetch-btn"
@@ -141,13 +175,25 @@ async function handleManualRefetch() {
         <p>Оберіть канал зі списку ліворуч, щоб почати спілкування.</p>
       </div>
 
+      <!-- Typing indicator bar -->
+      <div v-if="channelsStore.currentChannelId !== null" class="typing-status-bar">
+        <span v-if="typingText" class="typing-text">{{ typingText }}</span>
+      </div>
+
       <!-- Message Input -->
       <MessageInput
         v-if="channelsStore.currentChannelId !== null"
         :disabled="messagesStore.loading[channelsStore.currentChannelId] || false"
         @send="handleSendMessage"
+        @typing="handleUserTyping"
       />
     </main>
+
+    <!-- Collapsible Member List Panel -->
+    <MemberList
+      v-if="showMembers && channelsStore.currentChannelId !== null"
+      @close="showMembers = false"
+    />
   </div>
 </template>
 
@@ -158,6 +204,11 @@ async function handleManualRefetch() {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  transition: grid-template-columns var(--dur-normal) var(--ease);
+}
+
+.workspace-layout.show-members-panel {
+  grid-template-columns: 260px 1fr 320px;
 }
 
 .layout-sidebar {
@@ -224,11 +275,23 @@ async function handleManualRefetch() {
 }
 
 .members-badge {
+  background: none;
+  border: none;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: var(--space-1);
   font-size: var(--text-xs);
   color: var(--text-secondary);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.members-badge:hover,
+.members-badge.active {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .refetch-btn {
@@ -241,6 +304,7 @@ async function handleManualRefetch() {
   justify-content: center;
   padding: var(--space-1);
   border-radius: var(--radius-sm);
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
 .refetch-btn:hover {
@@ -257,7 +321,28 @@ async function handleManualRefetch() {
   font-size: var(--text-base);
 }
 
+.typing-status-bar {
+  height: 20px;
+  padding: 0 var(--space-4);
+  margin-bottom: var(--space-1);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.typing-text {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-style: italic;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
 .mono {
   font-family: var(--font-mono);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 </style>

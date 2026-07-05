@@ -168,5 +168,80 @@ export const useMessagesStore = defineStore('messages', {
         throw err
       }
     },
+
+    handleMessageSent(channelId: number, message: Message) {
+      if (!this.messages[channelId]) {
+        this.messages[channelId] = []
+      }
+
+      const currentMsgs = this.messages[channelId]
+
+      // 1. Check if we already have this message by server ID
+      const exists = currentMsgs.some((m) => m.id === message.id)
+      if (exists) return
+
+      // 2. Check if we have an optimistic message with the same client_message_id
+      const optIdx = currentMsgs.findIndex(
+        (m) => m.client_message_id === message.client_message_id
+      )
+
+      if (optIdx !== -1) {
+        // Replace optimistic message
+        currentMsgs[optIdx] = message
+      } else {
+        // Just push and sort (or push since it's newer)
+        currentMsgs.push(message)
+        currentMsgs.sort((a, b) => a.id - b.id)
+      }
+    },
+
+    handleMessageUpdated(channelId: number, message: Message) {
+      const currentMsgs = this.messages[channelId] ?? []
+      const idx = currentMsgs.findIndex((m) => m.id === message.id)
+      if (idx !== -1) {
+        currentMsgs[idx] = message
+      }
+    },
+
+    handleMessageDeleted(channelId: number, payload: { id: number; channel_id: number }) {
+      const currentMsgs = this.messages[channelId] ?? []
+      const idx = currentMsgs.findIndex((m) => m.id === payload.id)
+      if (idx !== -1) {
+        currentMsgs[idx].deleted_at = new Date().toISOString()
+      }
+    },
+
+    async reconnectAndSync(channelId: number) {
+      if (this.loading[channelId]) return
+
+      const currentMsgs = this.messages[channelId] ?? []
+
+      this.loading[channelId] = true
+
+      try {
+        // We load messages. Since we don't have an explicit ?after parameter,
+        // we fetch the latest 50 messages and do an idempotent merge.
+        const result = await fetchMessages(channelId, { limit: 50 })
+
+        const existingIds = new Set(currentMsgs.map((m) => m.id))
+        const existingClientIds = new Set(
+          currentMsgs.map((m) => m.client_message_id).filter(Boolean)
+        )
+
+        const newMessagesToMerge = result.data.filter((m) => {
+          return !existingIds.has(m.id) && !existingClientIds.has(m.client_message_id)
+        })
+
+        if (newMessagesToMerge.length > 0) {
+          this.messages[channelId] = [...currentMsgs, ...newMessagesToMerge].sort(
+            (a, b) => a.id - b.id
+          )
+        }
+      } catch (err) {
+        console.error('Failed to sync messages on reconnect:', err)
+      } finally {
+        this.loading[channelId] = false
+      }
+    },
   },
 })
