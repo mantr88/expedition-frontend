@@ -3,6 +3,7 @@ import { onMounted, watch, ref, computed } from 'vue'
 import { useChannelsStore } from '../stores/channels'
 import { useMessagesStore } from '../stores/messages'
 import { usePresenceStore } from '../stores/presence'
+import { useNotificationsStore } from '../stores/notifications'
 import { useEcho } from '../composables/useEcho'
 import { useTyping } from '../composables/useTyping'
 import ChannelSidebar from '../components/ChannelSidebar.vue'
@@ -14,6 +15,7 @@ import { PhHash, PhLock, PhUsers, PhArrowClockwise } from '@phosphor-icons/vue'
 const channelsStore = useChannelsStore()
 const messagesStore = useMessagesStore()
 const presenceStore = usePresenceStore()
+const notificationsStore = useNotificationsStore()
 
 // Initialize Laravel Echo / Reverb integration
 useEcho()
@@ -25,6 +27,8 @@ const showMembers = ref(false)
 
 onMounted(async () => {
   try {
+    notificationsStore.init()
+    notificationsStore.requestPermission()
     await channelsStore.loadChannels()
   } catch (err) {
     console.error('Failed to load initial workspace data:', err)
@@ -38,6 +42,11 @@ watch(
     if (newChanId !== null) {
       try {
         await messagesStore.loadMessages(newChanId)
+        const msgs = messagesStore.messages[newChanId]
+        if (msgs && msgs.length > 0) {
+          const maxId = Math.max(...msgs.map(m => m.id))
+          channelsStore.markAsRead(newChanId, maxId)
+        }
       } catch (err) {
         console.error('Failed to load channel messages:', err)
       }

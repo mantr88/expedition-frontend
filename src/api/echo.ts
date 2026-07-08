@@ -28,10 +28,10 @@ export interface StateChangeDetails {
 }
 
 export type StateChangeCallback = (states: StateChangeDetails) => void
-export type EventCallback = (data: unknown) => void
+export type EventCallback = (data: any) => void
 export type WhisperCallback = (data: Record<string, unknown> & { user_id: number; name: string }) => void
-export type MemberCallback = (member: Record<string, unknown> & { id: number; name: string }) => void
-export type MembersCallback = (members: Array<Record<string, unknown> & { id: number; name: string }>) => void
+export type MemberCallback = (member: any) => void
+export type MembersCallback = (members: any[]) => void
 
 interface EchoChannel {
   name: string
@@ -227,6 +227,10 @@ export class MockEcho {
     delete this.channels[`presence-${name}`]
   }
 
+  leaveChannel(name: string) {
+    delete this.channels[name]
+  }
+
   disconnect() {}
   connect() {}
 
@@ -252,9 +256,9 @@ export class MockEcho {
   }
 }
 
-let echoInstance: Echo | MockEcho | null = null
+let echoInstance: Echo<'reverb'> | MockEcho | null = null
 
-export function getEcho(): Echo | MockEcho {
+export function getEcho(): Echo<'reverb'> | MockEcho {
   if (echoInstance) return echoInstance
 
   const useMocks = import.meta.env.VITE_USE_MOCKS !== 'false'
@@ -287,17 +291,17 @@ export function getEcho(): Echo | MockEcho {
     enabledTransports: ['ws', 'wss'],
     authorizer: (channel: EchoChannel) => {
       return {
-        authorize: (socketId: string, callback: (error: boolean, data: unknown) => void) => {
+        authorize: (socketId: string, callback: (error: Error | null, data: any) => void) => {
           apiClient
             .post('/api/broadcasting/auth', {
               socket_id: socketId,
               channel_name: channel.name,
             })
             .then((response) => {
-              callback(false, response.data)
+              callback(null, response.data)
             })
             .catch((error) => {
-              callback(true, error)
+              callback(error instanceof Error ? error : new Error(String(error)), null)
             })
         },
       }

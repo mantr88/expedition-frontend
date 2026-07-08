@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import MessageInput from './MessageInput.vue'
 
 describe('MessageInput', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
   it('disables send button when text is empty', () => {
     const wrapper = mount(MessageInput)
     const sendBtn = wrapper.find('.send-btn')

@@ -3,6 +3,8 @@ import { getEcho } from '../api/echo'
 import { useChannelsStore } from '../stores/channels'
 import { useMessagesStore } from '../stores/messages'
 import { usePresenceStore } from '../stores/presence'
+import { useAuthStore } from '../stores/auth'
+import { useNotificationsStore } from '../stores/notifications'
 import type { Message } from '../types/Message'
 import type { Channel } from '../types/Channel'
 import type { User } from '../types/User'
@@ -30,6 +32,8 @@ export function useEcho() {
   const channelsStore = useChannelsStore()
   const messagesStore = useMessagesStore()
   const presenceStore = usePresenceStore()
+  const authStore = useAuthStore()
+  const notificationsStore = useNotificationsStore()
   const echo = getEcho()
 
   // Bind reconnect listener once
@@ -54,30 +58,79 @@ export function useEcho() {
     }
   }
 
-  // Watch channel selection
+  // Watch user to subscribe to personal notifications
+  watch(
+    () => authStore.user?.id,
+    (newUserId, oldUserId) => {
+      if (oldUserId) {
+        echo.leaveChannel(`private-user.${oldUserId}`)
+      }
+
+      if (newUserId) {
+        const userChan = echo.private(`user.${newUserId}`)
+        userChan.listen('.Mentioned', (payload: { message: Message, channel: Channel }) => {
+          notificationsStore.showNotification(`Нова згадка у ${payload.channel.name}`, {
+            body: payload.message.body_raw,
+          })
+        })
+        userChan.listen('.AddedToChannel', (payload: { channel: Channel }) => {
+          const exists = channelsStore.channels.some(c => c.id === payload.channel.id)
+          if (!exists) {
+            channelsStore.channels.push(payload.channel)
+          }
+        })
+      }
+    },
+    { immediate: true }
+  )
+
+  const subscribedPrivateChannels = new Set<number>()
+
+  // Watch all channels to subscribe to private channels
+  watch(
+    () => channelsStore.channels,
+    (channels) => {
+      channels.forEach(channel => {
+        if (!subscribedPrivateChannels.has(channel.id)) {
+          subscribedPrivateChannels.add(channel.id)
+          const privateChan = echo.private(`channel.${channel.id}`)
+          
+          privateChan.listen('.MessageSent', (payload: Message) => {
+            messagesStore.handleMessageSent(channel.id, payload)
+            
+            if (channelsStore.currentChannelId === channel.id) {
+              channelsStore.markAsRead(channel.id, payload.id)
+            } else if (channel.type === 'dm') {
+              // Show notification for DM if it's not the active channel
+              notificationsStore.showNotification(`Нове повідомлення від ${channel.name}`, {
+                body: payload.body_raw,
+              })
+            }
+          })
+          privateChan.listen('.MessageUpdated', (payload: Message) => {
+            messagesStore.handleMessageUpdated(channel.id, payload)
+          })
+          privateChan.listen('.MessageDeleted', (payload: MessageDeletedEvent) => {
+            messagesStore.handleMessageDeleted(channel.id, payload)
+          })
+          privateChan.listen('.ChannelUpdated', (payload: Channel) => {
+            channelsStore.handleChannelUpdated(payload)
+          })
+        }
+      })
+    },
+    { immediate: true, deep: true }
+  )
+
+  // Watch active channel and manage presence
   watch(
     () => channelsStore.currentChannelId,
     (newChanId, oldChanId) => {
       if (oldChanId !== null) {
-        echo.leave(`channel.${oldChanId}`)
+        echo.leaveChannel(`presence-channel.${oldChanId}`)
       }
 
       if (newChanId !== null) {
-        // Subscribe to private channel
-        const privateChan = echo.private(`channel.${newChanId}`)
-        privateChan.listen('.MessageSent', (payload: Message) => {
-          messagesStore.handleMessageSent(newChanId, payload)
-        })
-        privateChan.listen('.MessageUpdated', (payload: Message) => {
-          messagesStore.handleMessageUpdated(newChanId, payload)
-        })
-        privateChan.listen('.MessageDeleted', (payload: MessageDeletedEvent) => {
-          messagesStore.handleMessageDeleted(newChanId, payload)
-        })
-        privateChan.listen('.ChannelUpdated', (payload: Channel) => {
-          channelsStore.handleChannelUpdated(payload)
-        })
-
         // Subscribe to presence channel
         const presenceChan = echo.join(`channel.${newChanId}`)
         presenceChan.here((users: User[]) => {
@@ -99,8 +152,17 @@ export function useEcho() {
   )
 
   onUnmounted(() => {
+    if (authStore.user) {
+      echo.leaveChannel(`private-user.${authStore.user.id}`)
+    }
+    
+    subscribedPrivateChannels.forEach(id => {
+      echo.leaveChannel(`private-channel.${id}`)
+    })
+    subscribedPrivateChannels.clear()
+
     if (channelsStore.currentChannelId !== null) {
-      echo.leave(`channel.${channelsStore.currentChannelId}`)
+      echo.leaveChannel(`presence-channel.${channelsStore.currentChannelId}`)
     }
   })
 }

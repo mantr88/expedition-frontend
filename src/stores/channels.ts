@@ -3,6 +3,8 @@ import {
   fetchChannels,
   createChannel as apiCreateChannel,
   fetchChannelMembers,
+  openDirectMessage as apiOpenDirectMessage,
+  markChannelAsRead as apiMarkChannelAsRead,
   type CreateChannelPayload,
 } from '../api/channels'
 import type { Channel, ChannelMember } from '../types/Channel'
@@ -28,6 +30,8 @@ export const useChannelsStore = defineStore('channels', {
     activeChannel: (state) => state.channels.find((c) => c.id === state.currentChannelId) ?? null,
     activeChannelMembers: (state) =>
       state.currentChannelId ? (state.members[state.currentChannelId] ?? []) : [],
+    publicChannels: (state) => state.channels.filter((c) => c.type !== 'dm'),
+    directMessages: (state) => state.channels.filter((c) => c.type === 'dm'),
   },
 
   actions: {
@@ -87,6 +91,50 @@ export const useChannelsStore = defineStore('channels', {
           ...this.channels[idx],
           ...channel,
         }
+      }
+    },
+
+    async openDirectMessage(userId: number) {
+      this.loading = true
+      this.error = null
+      try {
+        const dmChannel = await apiOpenDirectMessage(userId)
+        const exists = this.channels.some((c) => c.id === dmChannel.id)
+        if (!exists) {
+          this.channels.push(dmChannel)
+        }
+        await this.selectChannel(dmChannel.id)
+        return dmChannel
+      } catch (err) {
+        this.error = 'Не вдалося відкрити особисті повідомлення.'
+        throw err
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async markAsRead(channelId: number, messageId: number) {
+      const channel = this.channels.find((c) => c.id === channelId)
+      if (!channel || !channel.my_membership) return
+
+      // Optimistic update
+      const currentRead = channel.my_membership.last_read_message_id ?? 0
+      if (messageId > currentRead) {
+        channel.my_membership.last_read_message_id = messageId
+        channel.unread_count = 0
+        try {
+          await apiMarkChannelAsRead(channelId, messageId)
+        } catch (err) {
+          console.error('Failed to mark channel as read', err)
+          // Ideally rollback, but since it's just unread markers it's not critical
+        }
+      }
+    },
+
+    incrementUnread(channelId: number) {
+      const channel = this.channels.find((c) => c.id === channelId)
+      if (channel) {
+        channel.unread_count = (channel.unread_count || 0) + 1
       }
     },
   },

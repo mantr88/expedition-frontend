@@ -1,9 +1,22 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import MessageList from './MessageList.vue'
 import { useAuthStore } from '../stores/auth'
 import type { Message } from '../types/Message'
+
+beforeAll(() => {
+  class MockIntersectionObserver {
+    observe = vi.fn()
+    disconnect = vi.fn()
+    unobserve = vi.fn()
+  }
+  vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+})
+
+afterAll(() => {
+  vi.unstubAllGlobals()
+})
 
 vi.mock('virtua/vue', () => {
   return {

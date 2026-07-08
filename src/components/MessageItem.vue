@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import type { Message } from '../types/Message'
 import { useAuthStore } from '../stores/auth'
+import { useUnread } from '../composables/useUnread'
 import { PhPencilSimple, PhTrash, PhSmiley, PhChatsCircle, PhCheck, PhX } from '@phosphor-icons/vue'
 
 const props = defineProps<{
@@ -20,6 +21,34 @@ const isEditing = ref(false)
 const editBody = ref(props.message.body_raw)
 
 const isOwner = authStore.user?.id === props.message.user.id
+
+const isMentioned = computed(() => {
+  if (!authStore.user || props.message.user.id === authStore.user.id) return false
+  const mentionPattern = new RegExp(`@${authStore.user.name}\\b`, 'i')
+  return mentionPattern.test(props.message.body_raw)
+})
+
+const { handleMessageVisible } = useUnread()
+const wrapperRef = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+
+onMounted(() => {
+  if (!wrapperRef.value) return
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        handleMessageVisible(props.message.channel_id, props.message.id)
+      }
+    })
+  }, { threshold: 0.5 })
+  observer.observe(wrapperRef.value)
+})
+
+onBeforeUnmount(() => {
+  if (observer) {
+    observer.disconnect()
+  }
+})
 
 function formatTime(dateStr: string) {
   const d = new Date(dateStr)
@@ -51,9 +80,10 @@ function handleDelete() {
 
 <template>
   <div
+    ref="wrapperRef"
     :class="[
       'message-item-wrapper',
-      { consecutive: isConsecutive, 'is-deleted': !!message.deleted_at },
+      { consecutive: isConsecutive, 'is-deleted': !!message.deleted_at, 'is-mentioned': isMentioned },
     ]"
   >
     <!-- Avatar and Name for non-consecutive message -->
@@ -129,6 +159,20 @@ function handleDelete() {
 
 .message-item-wrapper:hover {
   background-color: var(--bg-hover);
+}
+
+.message-item-wrapper.is-mentioned {
+  background-color: var(--mention-bg);
+}
+
+.message-item-wrapper.is-mentioned::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--rail-active);
 }
 
 .message-header-row {

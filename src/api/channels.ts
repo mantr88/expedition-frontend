@@ -39,6 +39,15 @@ export async function archiveChannel(channelId: number): Promise<void> {
   await apiClient.delete(`/api/channels/${channelId}`)
 }
 
+export async function openDirectMessage(userId: number): Promise<Channel> {
+  const response = await apiClient.post<Channel>('/api/channels/dm', { user_id: userId })
+  return response.data
+}
+
+export async function markChannelAsRead(channelId: number, lastReadMessageId: number): Promise<void> {
+  await apiClient.post(`/api/channels/${channelId}/read`, { last_read_message_id: lastReadMessageId })
+}
+
 export async function fetchChannelMembers(channelId: number): Promise<ChannelMember[]> {
   const response = await apiClient.get<{ data: ChannelMember[] }>(
     `/api/channels/${channelId}/members`,

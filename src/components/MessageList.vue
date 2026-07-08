@@ -4,6 +4,8 @@ import { VList } from 'virtua/vue'
 import type { Message } from '../types/Message'
 import MessageItem from './MessageItem.vue'
 import { useInfiniteScroll } from '../composables/useInfiniteScroll'
+import { useChannelsStore } from '../stores/channels'
+import { computed } from 'vue'
 
 const props = defineProps<{
   messages: Message[]
@@ -21,6 +23,11 @@ const vListRef = ref<null | {
   scrollToIndex?: (index: number) => void
 }>(null)
 const { handleScrollUp } = useInfiniteScroll()
+
+const channelsStore = useChannelsStore()
+const lastReadMessageId = computed(() => {
+  return channelsStore.activeChannel?.my_membership?.last_read_message_id ?? Number.MAX_SAFE_INTEGER
+})
 
 function checkConsecutive(msg: Message, index: number) {
   if (index === 0) return false
@@ -97,6 +104,9 @@ function onDelete(messageId: number) {
 
     <VList v-else ref="vListRef" :data="messages" class="scroll-container" @scroll="onScroll">
       <template #default="{ item: msg, index }">
+        <div v-if="msg.id > lastReadMessageId && (index === 0 || messages[index - 1].id <= lastReadMessageId)" class="new-messages-divider">
+          <span class="divider-text">Нові повідомлення</span>
+        </div>
         <MessageItem
           :key="msg.id"
           :message="msg"
@@ -161,5 +171,27 @@ function onDelete(messageId: number) {
   to {
     transform: rotate(360deg);
   }
+}
+
+.new-messages-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: var(--space-4) 0;
+}
+
+.new-messages-divider::before,
+.new-messages-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--indigo-300);
+}
+
+.divider-text {
+  padding: 0 var(--space-3);
+  color: var(--indigo-600);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 </style>

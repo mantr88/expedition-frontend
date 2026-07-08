@@ -7,6 +7,7 @@ import {
 } from '../api/messages'
 import type { Message } from '../types/Message'
 import { useAuthStore } from './auth'
+import { useChannelsStore } from './channels'
 
 interface MessagesState {
   messages: Record<number, Message[]>
@@ -192,6 +193,12 @@ export const useMessagesStore = defineStore('messages', {
         // Just push and sort (or push since it's newer)
         currentMsgs.push(message)
         currentMsgs.sort((a, b) => a.id - b.id)
+        
+        // Increment unread count if it's not the active channel
+        const channelsStore = useChannelsStore()
+        if (channelsStore.currentChannelId !== channelId) {
+          channelsStore.incrementUnread(channelId)
+        }
       }
     },
 

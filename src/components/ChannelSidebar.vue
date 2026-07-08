@@ -3,7 +3,9 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChannelsStore } from '../stores/channels'
 import { useAuthStore } from '../stores/auth'
-import { PhHash, PhLock, PhPlus, PhSignOut } from '@phosphor-icons/vue'
+import { searchUsers } from '../api/users'
+import type { User } from '../types/User'
+import { PhHash, PhLock, PhPlus, PhSignOut, PhChat } from '@phosphor-icons/vue'
 
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
@@ -42,6 +44,38 @@ async function handleLogout() {
   await authStore.logout()
   await router.push({ name: 'login' })
 }
+
+// DM Search state
+const showDmModal = ref(false)
+const dmSearchQuery = ref('')
+const dmSearchResults = ref<User[]>([])
+const isSearching = ref(false)
+
+async function handleSearchUsers() {
+  if (!dmSearchQuery.value.trim()) {
+    dmSearchResults.value = []
+    return
+  }
+  isSearching.value = true
+  try {
+    dmSearchResults.value = await searchUsers(dmSearchQuery.value)
+  } catch (err) {
+    console.error('Search failed:', err)
+  } finally {
+    isSearching.value = false
+  }
+}
+
+async function startDirectMessage(userId: number) {
+  try {
+    await channelsStore.openDirectMessage(userId)
+    showDmModal.value = false
+    dmSearchQuery.value = ''
+    dmSearchResults.value = []
+  } catch (err) {
+    console.error('Failed to start DM', err)
+  }
+}
 </script>
 
 <template>
@@ -60,9 +94,9 @@ async function handleLogout() {
 
       <div class="channel-list">
         <div
-          v-for="channel in channelsStore.channels"
+          v-for="channel in channelsStore.publicChannels"
           :key="channel.id"
-          :class="['channel-item', { active: channel.id === channelsStore.currentChannelId }]"
+          :class="['channel-item', { active: channel.id === channelsStore.currentChannelId, unread: channel.unread_count && channel.unread_count > 0 }]"
           @click="channelsStore.selectChannel(channel.id)"
         >
           <component
@@ -71,6 +105,33 @@ async function handleLogout() {
             class="channel-icon"
           />
           <span class="channel-name">{{ channel.name }}</span>
+          <span v-if="channel.unread_count && channel.unread_count > 0" class="unread-badge">
+            {{ channel.unread_count }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-header">
+        <span class="section-title">Особисті повідомлення</span>
+        <button class="add-btn" aria-label="Почати бесіду" @click="showDmModal = true">
+          <PhPlus :size="16" />
+        </button>
+      </div>
+
+      <div class="channel-list">
+        <div
+          v-for="channel in channelsStore.directMessages"
+          :key="channel.id"
+          :class="['channel-item', { active: channel.id === channelsStore.currentChannelId, unread: channel.unread_count && channel.unread_count > 0 }]"
+          @click="channelsStore.selectChannel(channel.id)"
+        >
+          <PhChat :size="16" class="channel-icon" />
+          <span class="channel-name">{{ channel.name }}</span>
+          <span v-if="channel.unread_count && channel.unread_count > 0" class="unread-badge">
+            {{ channel.unread_count }}
+          </span>
         </div>
       </div>
     </div>
@@ -134,6 +195,47 @@ async function handleLogout() {
             <button type="submit" class="btn btn-primary">Створити</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Start DM Modal -->
+    <div v-if="showDmModal" class="modal-overlay" @click.self="showDmModal = false">
+      <div class="modal-content">
+        <h3 class="modal-title">Нове повідомлення</h3>
+        <div class="form-group">
+          <label for="dm-search">Знайти колегу</label>
+          <input
+            id="dm-search"
+            v-model="dmSearchQuery"
+            type="text"
+            placeholder="Введіть ім'я..."
+            @input="handleSearchUsers"
+          />
+        </div>
+        
+        <div class="dm-results">
+          <div v-if="isSearching" class="search-status">Шукаємо...</div>
+          <div v-else-if="dmSearchResults.length === 0 && dmSearchQuery" class="search-status">
+            Нікого не знайдено
+          </div>
+          <div
+            v-for="user in dmSearchResults"
+            :key="user.id"
+            class="dm-user-item"
+            @click="startDirectMessage(user.id)"
+          >
+            <div class="user-avatar-placeholder sm">
+              {{ user.name.charAt(0) }}
+            </div>
+            <div class="user-name">{{ user.name }}</div>
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" @click="showDmModal = false">
+            Скасувати
+          </button>
+        </div>
       </div>
     </div>
   </aside>
@@ -427,5 +529,61 @@ async function handleLogout() {
 
 .btn-primary:hover {
   background-color: var(--indigo-700);
+}
+
+.unread-badge {
+  margin-left: auto;
+  background-color: var(--indigo-600);
+  color: var(--text-onbrand);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  height: 18px;
+  min-width: 18px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.channel-item.unread .channel-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.dm-results {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+}
+
+.search-status {
+  padding: var(--space-3);
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.dm-user-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+.dm-user-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.user-avatar-placeholder.sm {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  border-radius: var(--radius-md);
 }
 </style>
