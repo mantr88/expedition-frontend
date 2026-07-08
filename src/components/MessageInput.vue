@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { PhPaperPlaneTilt, PhPaperclip, PhSmiley, PhAt } from '@phosphor-icons/vue'
 import { useMentions } from '../composables/useMentions'
+import type { User } from '../types/User'
 
 const props = defineProps<{
   placeholder?: string
@@ -59,7 +60,7 @@ function onTextareaInput() {
   }
 }
 
-function selectMention(user: any) {
+function selectMention(user: User) {
   text.value = insertMention(text.value, user)
   if (textareaRef.value) {
     textareaRef.value.focus()

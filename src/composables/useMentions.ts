@@ -65,7 +65,7 @@ export function useMentions() {
 
     const beforeMention = text.slice(0, mentionStartIndex.value)
     // Find where the mention ends
-    let afterMentionStart = mentionStartIndex.value + 1 + mentionQuery.value.length
+    const afterMentionStart = mentionStartIndex.value + 1 + mentionQuery.value.length
     const afterMention = text.slice(afterMentionStart)
 
     const newText = `${beforeMention}@${user.name} ${afterMention}`

@@ -1,6 +1,7 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 import { apiClient } from './client'
+import type { User } from '../types/User'
 
 interface PusherModule {
   Pusher?: unknown
@@ -29,12 +30,13 @@ export interface StateChangeDetails {
 }
 
 export type StateChangeCallback = (states: StateChangeDetails) => void
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type EventCallback = (data: any) => void
 export type WhisperCallback = (
   data: Record<string, unknown> & { user_id: number; name: string },
 ) => void
-export type MemberCallback = (member: any) => void
-export type MembersCallback = (members: any[]) => void
+export type MemberCallback = (member: User) => void
+export type MembersCallback = (members: User[]) => void
 
 interface EchoChannel {
   name: string
@@ -129,7 +131,7 @@ class MockChannel {
 }
 
 class MockPresenceChannel extends MockChannel {
-  private members: Array<Record<string, unknown> & { id: number; name: string }> = []
+  private members: User[] = []
   private hereCallback: MembersCallback = () => {}
   private joiningCallback: MemberCallback = () => {}
   private leavingCallback: MemberCallback = () => {}
@@ -152,14 +154,14 @@ class MockPresenceChannel extends MockChannel {
     return this
   }
 
-  setMembers(members: Array<Record<string, unknown> & { id: number; name: string }>) {
+  setMembers(members: User[]) {
     this.members = members
     if (this.hereCallback) {
       this.hereCallback(members)
     }
   }
 
-  triggerJoin(member: Record<string, unknown> & { id: number; name: string }) {
+  triggerJoin(member: User) {
     if (!this.members.some((m) => m.id === member.id)) {
       this.members.push(member)
     }
@@ -168,7 +170,7 @@ class MockPresenceChannel extends MockChannel {
     }
   }
 
-  triggerLeave(member: Record<string, unknown> & { id: number; name: string }) {
+  triggerLeave(member: User) {
     this.members = this.members.filter((m) => m.id !== member.id)
     if (this.leavingCallback) {
       this.leavingCallback(member)
@@ -300,6 +302,7 @@ export function getEcho(): Echo<'reverb'> | MockEcho {
     enabledTransports: ['ws', 'wss'],
     authorizer: (channel: EchoChannel) => {
       return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         authorize: (socketId: string, callback: (error: Error | null, data: any) => void) => {
           apiClient
             .post('/api/broadcasting/auth', {
