@@ -104,7 +104,13 @@ function onDelete(messageId: number) {
 
     <VList v-else ref="vListRef" :data="messages" class="scroll-container" @scroll="onScroll">
       <template #default="{ item: msg, index }">
-        <div v-if="msg.id > lastReadMessageId && (index === 0 || messages[index - 1].id <= lastReadMessageId)" class="new-messages-divider">
+        <div
+          v-if="
+            msg.id > lastReadMessageId &&
+            (index === 0 || messages[index - 1].id <= lastReadMessageId)
+          "
+          class="new-messages-divider"
+        >
           <span class="divider-text">Нові повідомлення</span>
         </div>
         <MessageItem

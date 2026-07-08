@@ -22,7 +22,7 @@ const {
   selectedMentionIndex,
   handleInput: processMentionsInput,
   navigateMentions,
-  insertMention
+  insertMention,
 } = useMentions()
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -260,7 +260,8 @@ function submit() {
   cursor: pointer;
 }
 
-.mention-item:hover, .mention-item.active {
+.mention-item:hover,
+.mention-item.active {
   background-color: var(--bg-hover);
 }
 

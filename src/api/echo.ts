@@ -20,7 +20,8 @@ if (typeof window !== 'undefined') {
   ;(window as unknown as { Pusher: unknown }).Pusher = PusherClass
 }
 
-export type ConnectionState = 'initialized' | 'connecting' | 'connected' | 'unavailable' | 'disconnected'
+export type ConnectionState =
+  'initialized' | 'connecting' | 'connected' | 'unavailable' | 'disconnected'
 
 export interface StateChangeDetails {
   previous: ConnectionState
@@ -29,7 +30,9 @@ export interface StateChangeDetails {
 
 export type StateChangeCallback = (states: StateChangeDetails) => void
 export type EventCallback = (data: any) => void
-export type WhisperCallback = (data: Record<string, unknown> & { user_id: number; name: string }) => void
+export type WhisperCallback = (
+  data: Record<string, unknown> & { user_id: number; name: string },
+) => void
 export type MemberCallback = (member: any) => void
 export type MembersCallback = (members: any[]) => void
 
@@ -98,7 +101,7 @@ class MockChannel {
     window.dispatchEvent(
       new CustomEvent('mock-echo-whisper', {
         detail: { channel: this.name, event, data },
-      })
+      }),
     )
     return this
   }
@@ -246,13 +249,19 @@ export class MockEcho {
   simulateDisconnect() {
     const prev = this.connector.pusher.connection.state
     this.connector.pusher.connection.state = 'disconnected'
-    this.connector.pusher.connection.trigger('state_change', { previous: prev, current: 'disconnected' })
+    this.connector.pusher.connection.trigger('state_change', {
+      previous: prev,
+      current: 'disconnected',
+    })
   }
 
   simulateConnect() {
     const prev = this.connector.pusher.connection.state
     this.connector.pusher.connection.state = 'connected'
-    this.connector.pusher.connection.trigger('state_change', { previous: prev, current: 'connected' })
+    this.connector.pusher.connection.trigger('state_change', {
+      previous: prev,
+      current: 'connected',
+    })
   }
 }
 

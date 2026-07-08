@@ -96,7 +96,13 @@ async function startDirectMessage(userId: number) {
         <div
           v-for="channel in channelsStore.publicChannels"
           :key="channel.id"
-          :class="['channel-item', { active: channel.id === channelsStore.currentChannelId, unread: channel.unread_count && channel.unread_count > 0 }]"
+          :class="[
+            'channel-item',
+            {
+              active: channel.id === channelsStore.currentChannelId,
+              unread: channel.unread_count && channel.unread_count > 0,
+            },
+          ]"
           @click="channelsStore.selectChannel(channel.id)"
         >
           <component
@@ -124,7 +130,13 @@ async function startDirectMessage(userId: number) {
         <div
           v-for="channel in channelsStore.directMessages"
           :key="channel.id"
-          :class="['channel-item', { active: channel.id === channelsStore.currentChannelId, unread: channel.unread_count && channel.unread_count > 0 }]"
+          :class="[
+            'channel-item',
+            {
+              active: channel.id === channelsStore.currentChannelId,
+              unread: channel.unread_count && channel.unread_count > 0,
+            },
+          ]"
           @click="channelsStore.selectChannel(channel.id)"
         >
           <PhChat :size="16" class="channel-icon" />
@@ -212,7 +224,7 @@ async function startDirectMessage(userId: number) {
             @input="handleSearchUsers"
           />
         </div>
-        
+
         <div class="dm-results">
           <div v-if="isSearching" class="search-status">Шукаємо...</div>
           <div v-else-if="dmSearchResults.length === 0 && dmSearchQuery" class="search-status">
@@ -230,7 +242,7 @@ async function startDirectMessage(userId: number) {
             <div class="user-name">{{ user.name }}</div>
           </div>
         </div>
-        
+
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" @click="showDmModal = false">
             Скасувати

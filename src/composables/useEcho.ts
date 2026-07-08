@@ -68,20 +68,20 @@ export function useEcho() {
 
       if (newUserId) {
         const userChan = echo.private(`user.${newUserId}`)
-        userChan.listen('.Mentioned', (payload: { message: Message, channel: Channel }) => {
+        userChan.listen('.Mentioned', (payload: { message: Message; channel: Channel }) => {
           notificationsStore.showNotification(`Нова згадка у ${payload.channel.name}`, {
             body: payload.message.body_raw,
           })
         })
         userChan.listen('.AddedToChannel', (payload: { channel: Channel }) => {
-          const exists = channelsStore.channels.some(c => c.id === payload.channel.id)
+          const exists = channelsStore.channels.some((c) => c.id === payload.channel.id)
           if (!exists) {
             channelsStore.channels.push(payload.channel)
           }
         })
       }
     },
-    { immediate: true }
+    { immediate: true },
   )
 
   const subscribedPrivateChannels = new Set<number>()
@@ -90,14 +90,14 @@ export function useEcho() {
   watch(
     () => channelsStore.channels,
     (channels) => {
-      channels.forEach(channel => {
+      channels.forEach((channel) => {
         if (!subscribedPrivateChannels.has(channel.id)) {
           subscribedPrivateChannels.add(channel.id)
           const privateChan = echo.private(`channel.${channel.id}`)
-          
+
           privateChan.listen('.MessageSent', (payload: Message) => {
             messagesStore.handleMessageSent(channel.id, payload)
-            
+
             if (channelsStore.currentChannelId === channel.id) {
               channelsStore.markAsRead(channel.id, payload.id)
             } else if (channel.type === 'dm') {
@@ -119,7 +119,7 @@ export function useEcho() {
         }
       })
     },
-    { immediate: true, deep: true }
+    { immediate: true, deep: true },
   )
 
   // Watch active channel and manage presence
@@ -148,15 +148,15 @@ export function useEcho() {
         })
       }
     },
-    { immediate: true }
+    { immediate: true },
   )
 
   onUnmounted(() => {
     if (authStore.user) {
       echo.leaveChannel(`private-user.${authStore.user.id}`)
     }
-    
-    subscribedPrivateChannels.forEach(id => {
+
+    subscribedPrivateChannels.forEach((id) => {
       echo.leaveChannel(`private-channel.${id}`)
     })
     subscribedPrivateChannels.clear()

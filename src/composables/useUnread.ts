@@ -3,21 +3,21 @@ import { useChannelsStore } from '../stores/channels'
 
 export function useUnread() {
   const channelsStore = useChannelsStore()
-  
+
   let timeoutId: number | null = null
 
   const markAsReadDebounced = (channelId: number, messageId: number) => {
     if (timeoutId) {
       window.clearTimeout(timeoutId)
     }
-    
+
     timeoutId = window.setTimeout(() => {
       channelsStore.markAsRead(channelId, messageId)
     }, 1000) // 1 second debounce
   }
 
   const handleMessageVisible = (channelId: number, messageId: number) => {
-    const channel = channelsStore.channels.find(c => c.id === channelId)
+    const channel = channelsStore.channels.find((c) => c.id === channelId)
     if (!channel || !channel.my_membership) return
 
     const lastRead = channel.my_membership.last_read_message_id || 0
@@ -33,6 +33,6 @@ export function useUnread() {
   })
 
   return {
-    handleMessageVisible
+    handleMessageVisible,
   }
 }

@@ -44,8 +44,13 @@ export async function openDirectMessage(userId: number): Promise<Channel> {
   return response.data
 }
 
-export async function markChannelAsRead(channelId: number, lastReadMessageId: number): Promise<void> {
-  await apiClient.post(`/api/channels/${channelId}/read`, { last_read_message_id: lastReadMessageId })
+export async function markChannelAsRead(
+  channelId: number,
+  lastReadMessageId: number,
+): Promise<void> {
+  await apiClient.post(`/api/channels/${channelId}/read`, {
+    last_read_message_id: lastReadMessageId,
+  })
 }
 
 export async function fetchChannelMembers(channelId: number): Promise<ChannelMember[]> {

@@ -118,7 +118,9 @@ function getPresenceLabel(userId: number, baseStatus: string) {
   justify-content: center;
   padding: var(--space-1);
   border-radius: var(--radius-sm);
-  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .close-btn:hover {

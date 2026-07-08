@@ -44,7 +44,7 @@ watch(
         await messagesStore.loadMessages(newChanId)
         const msgs = messagesStore.messages[newChanId]
         if (msgs && msgs.length > 0) {
-          const maxId = Math.max(...msgs.map(m => m.id))
+          const maxId = Math.max(...msgs.map((m) => m.id))
           channelsStore.markAsRead(newChanId, maxId)
         }
       } catch (err) {
@@ -294,7 +294,9 @@ const typingText = computed(() => {
   color: var(--text-secondary);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .members-badge:hover,
@@ -313,7 +315,9 @@ const typingText = computed(() => {
   justify-content: center;
   padding: var(--space-1);
   border-radius: var(--radius-sm);
-  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .refetch-btn:hover {
@@ -351,7 +355,12 @@ const typingText = computed(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 </style>

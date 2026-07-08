@@ -12,12 +12,12 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   async function requestPermission() {
     if (!('Notification' in window)) return false
-    
+
     if (permission.value === 'default') {
       const result = await Notification.requestPermission()
       permission.value = result
     }
-    
+
     return permission.value === 'granted'
   }
 
@@ -34,6 +34,6 @@ export const useNotificationsStore = defineStore('notifications', () => {
     permission,
     init,
     requestPermission,
-    showNotification
+    showNotification,
   }
 })

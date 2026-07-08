@@ -166,15 +166,14 @@ export const handlers = [
     }
     const url = new URL(request.url)
     const query = (url.searchParams.get('query') || '').toLowerCase()
-    
-    let results = mockUsers.filter(u => u.id !== currentUser.id)
+
+    let results = mockUsers.filter((u) => u.id !== currentUser.id)
     if (query) {
-      results = results.filter(u => u.name.toLowerCase().includes(query))
+      results = results.filter((u) => u.name.toLowerCase().includes(query))
     }
-    
+
     return HttpResponse.json({ data: results })
   }),
-
 
   // Channels endpoints
   http.get('*/api/channels', () => {
@@ -223,14 +222,14 @@ export const handlers = [
     if (!body.user_id) {
       return HttpResponse.json({ message: 'Validation failed' }, { status: 422 })
     }
-    
-    const targetUser = mockUsers.find(u => u.id === body.user_id)
+
+    const targetUser = mockUsers.find((u) => u.id === body.user_id)
     if (!targetUser) {
       return HttpResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
     // Find if DM channel already exists
-    const existingDm = channels.find(c => c.type === 'dm' && c.name === targetUser.name)
+    const existingDm = channels.find((c) => c.type === 'dm' && c.name === targetUser.name)
     if (existingDm) {
       return HttpResponse.json(existingDm)
     }
@@ -259,11 +258,14 @@ export const handlers = [
     }
     const channelId = Number(params.channelId)
     const body = (await request.json()) as { last_read_message_id: number }
-    
+
     const channel = channels.find((c) => c.id === channelId)
     if (channel && channel.my_membership) {
       // update last read if it's greater than current
-      if (!channel.my_membership.last_read_message_id || body.last_read_message_id > channel.my_membership.last_read_message_id) {
+      if (
+        !channel.my_membership.last_read_message_id ||
+        body.last_read_message_id > channel.my_membership.last_read_message_id
+      ) {
         channel.my_membership.last_read_message_id = body.last_read_message_id
         channel.unread_count = 0
       }
@@ -271,7 +273,6 @@ export const handlers = [
 
     return new HttpResponse(null, { status: 204 })
   }),
-
 
   http.get('*/api/channels/:channelId/members', () => {
     if (!isAuthenticated) {

@@ -34,13 +34,16 @@ let observer: IntersectionObserver | null = null
 
 onMounted(() => {
   if (!wrapperRef.value) return
-  observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        handleMessageVisible(props.message.channel_id, props.message.id)
-      }
-    })
-  }, { threshold: 0.5 })
+  observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          handleMessageVisible(props.message.channel_id, props.message.id)
+        }
+      })
+    },
+    { threshold: 0.5 },
+  )
   observer.observe(wrapperRef.value)
 })
 
@@ -83,7 +86,11 @@ function handleDelete() {
     ref="wrapperRef"
     :class="[
       'message-item-wrapper',
-      { consecutive: isConsecutive, 'is-deleted': !!message.deleted_at, 'is-mentioned': isMentioned },
+      {
+        consecutive: isConsecutive,
+        'is-deleted': !!message.deleted_at,
+        'is-mentioned': isMentioned,
+      },
     ]"
   >
     <!-- Avatar and Name for non-consecutive message -->

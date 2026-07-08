@@ -182,9 +182,7 @@ export const useMessagesStore = defineStore('messages', {
       if (exists) return
 
       // 2. Check if we have an optimistic message with the same client_message_id
-      const optIdx = currentMsgs.findIndex(
-        (m) => m.client_message_id === message.client_message_id
-      )
+      const optIdx = currentMsgs.findIndex((m) => m.client_message_id === message.client_message_id)
 
       if (optIdx !== -1) {
         // Replace optimistic message
@@ -193,7 +191,7 @@ export const useMessagesStore = defineStore('messages', {
         // Just push and sort (or push since it's newer)
         currentMsgs.push(message)
         currentMsgs.sort((a, b) => a.id - b.id)
-        
+
         // Increment unread count if it's not the active channel
         const channelsStore = useChannelsStore()
         if (channelsStore.currentChannelId !== channelId) {
@@ -232,7 +230,7 @@ export const useMessagesStore = defineStore('messages', {
 
         const existingIds = new Set(currentMsgs.map((m) => m.id))
         const existingClientIds = new Set(
-          currentMsgs.map((m) => m.client_message_id).filter(Boolean)
+          currentMsgs.map((m) => m.client_message_id).filter(Boolean),
         )
 
         const newMessagesToMerge = result.data.filter((m) => {
@@ -241,7 +239,7 @@ export const useMessagesStore = defineStore('messages', {
 
         if (newMessagesToMerge.length > 0) {
           this.messages[channelId] = [...currentMsgs, ...newMessagesToMerge].sort(
-            (a, b) => a.id - b.id
+            (a, b) => a.id - b.id,
           )
         }
       } catch (err) {
