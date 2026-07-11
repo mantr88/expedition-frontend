@@ -31,7 +31,7 @@ describe('MessageInput', () => {
     await sendBtn.trigger('click')
 
     expect(wrapper.emitted('send')).toBeTruthy()
-    expect(wrapper.emitted('send')![0]).toEqual(['Hello world'])
+    expect(wrapper.emitted('send')![0]).toEqual(['Hello world', []])
     expect(textarea.element.value).toBe('')
   })
 
@@ -43,7 +43,7 @@ describe('MessageInput', () => {
     await textarea.trigger('keydown', { key: 'Enter', shiftKey: false })
 
     expect(wrapper.emitted('send')).toBeTruthy()
-    expect(wrapper.emitted('send')![0]).toEqual(['Test keydown'])
+    expect(wrapper.emitted('send')![0]).toEqual(['Test keydown', []])
     expect(textarea.element.value).toBe('')
   })
 

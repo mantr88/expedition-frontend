@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import type { Message } from '../types/Message'
 import { useAuthStore } from '../stores/auth'
+import { useMessagesStore } from '../stores/messages'
 import { useUnread } from '../composables/useUnread'
 import { PhPencilSimple, PhTrash, PhSmiley, PhChatsCircle, PhCheck, PhX } from '@phosphor-icons/vue'
+import AttachmentCard from './MessageAttachment.vue'
+import ReactionBar from './ReactionBar.vue'
+import EmojiPicker from './EmojiPicker.vue'
 
 const props = defineProps<{
   message: Message
@@ -16,9 +20,11 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const messagesStore = useMessagesStore()
 
 const isEditing = ref(false)
 const editBody = ref(props.message.body_raw)
+const showEmojiPicker = ref(false)
 
 const isOwner = authStore.user?.id === props.message.user.id
 
@@ -51,6 +57,7 @@ onBeforeUnmount(() => {
   if (observer) {
     observer.disconnect()
   }
+  document.removeEventListener('click', clickOutsideHandler)
 })
 
 function formatTime(dateStr: string) {
@@ -79,6 +86,41 @@ function handleDelete() {
     emit('delete', props.message.id)
   }
 }
+
+function handleAddReaction() {
+  showEmojiPicker.value = !showEmojiPicker.value
+}
+
+function clickOutsideHandler(event: MouseEvent) {
+  const pickerEl = wrapperRef.value?.querySelector('.emoji-picker-wrapper')
+  if (pickerEl && !pickerEl.contains(event.target as Node)) {
+    showEmojiPicker.value = false
+  }
+}
+
+watch(showEmojiPicker, (isOpen) => {
+  if (isOpen) {
+    // Use capture or setTimeout to avoid immediate trigger during the click that opens it
+    setTimeout(() => {
+      document.addEventListener('click', clickOutsideHandler)
+    }, 0)
+  } else {
+    document.removeEventListener('click', clickOutsideHandler)
+  }
+})
+
+function selectEmoji(emoji: string) {
+  showEmojiPicker.value = false
+  messagesStore.toggleReaction(props.message.channel_id, props.message.id, emoji)
+}
+
+function toggleReaction(emoji: string) {
+  messagesStore.toggleReaction(props.message.channel_id, props.message.id, emoji)
+}
+
+function openThread() {
+  messagesStore.openThread(props.message)
+}
 </script>
 
 <template>
@@ -90,6 +132,7 @@ function handleDelete() {
         consecutive: isConsecutive,
         'is-deleted': !!message.deleted_at,
         'is-mentioned': isMentioned,
+        'picker-open': showEmojiPicker,
       },
     ]"
   >
@@ -130,6 +173,25 @@ function handleDelete() {
         <!-- Render html body -->
         <div v-else class="message-body" v-html="message.body_html"></div>
 
+        <!-- Attachments -->
+        <div v-if="message.attachments && message.attachments.length > 0" class="attachments-list">
+          <AttachmentCard v-for="att in message.attachments" :key="att.id" :attachment="att" />
+        </div>
+
+        <!-- Reactions -->
+        <ReactionBar
+          v-if="message.reactions"
+          :reactions="message.reactions"
+          @toggle="toggleReaction"
+          @add-reaction="handleAddReaction"
+        />
+
+        <!-- Thread replies indicator -->
+        <div v-if="message.reply_count > 0" class="thread-replies-indicator" @click="openThread">
+          <span class="reply-count">{{ message.reply_count }} відповідей</span>
+          <span v-if="message.last_reply_at" class="last-reply mono">· остання {{ formatTime(message.last_reply_at) }}</span>
+        </div>
+
         <!-- Metadata signs (edited, sending, failed) -->
         <span v-if="message.edited_at && !message.deleted_at" class="edited-badge mono">
           (змінено)
@@ -141,10 +203,10 @@ function handleDelete() {
 
     <!-- Floating Actions Toolbar -->
     <div v-if="!message.deleted_at && !isEditing" class="floating-actions">
-      <button class="action-btn" aria-label="Додати реакцію">
+      <button class="action-btn" aria-label="Додати реакцію" @click.stop="handleAddReaction">
         <PhSmiley :size="18" />
       </button>
-      <button class="action-btn" aria-label="Відповісти в треді">
+      <button class="action-btn" aria-label="Відповісти в треді" @click.stop="openThread">
         <PhChatsCircle :size="18" />
       </button>
       <button v-if="isOwner" class="action-btn" aria-label="Редагувати" @click="startEdit">
@@ -153,6 +215,11 @@ function handleDelete() {
       <button v-if="isOwner" class="action-btn danger" aria-label="Видалити" @click="handleDelete">
         <PhTrash :size="18" />
       </button>
+    </div>
+
+    <!-- Emoji Picker Popover -->
+    <div v-if="showEmojiPicker" class="emoji-picker-wrapper" @click.stop>
+      <EmojiPicker @select="selectEmoji" />
     </div>
   </div>
 </template>
@@ -164,8 +231,18 @@ function handleDelete() {
   transition: background-color var(--dur-fast) var(--ease);
 }
 
-.message-item-wrapper:hover {
+.message-item-wrapper:hover,
+.message-item-wrapper.picker-open {
   background-color: var(--bg-hover);
+}
+
+.message-item-wrapper.picker-open {
+  z-index: 50;
+}
+
+.message-item-wrapper.picker-open .floating-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .message-item-wrapper.is-mentioned {
@@ -410,5 +487,49 @@ function handleDelete() {
 .save-btn {
   background-color: var(--indigo-600);
   color: var(--text-onbrand);
+}
+
+.attachments-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  width: 100%;
+}
+
+.thread-replies-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding: 4px 8px;
+  background-color: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+  width: fit-content;
+}
+
+.thread-replies-indicator:hover {
+  background-color: var(--bg-active);
+}
+
+.reply-count {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--indigo-600);
+}
+
+.last-reply {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.emoji-picker-wrapper {
+  position: absolute;
+  right: var(--space-4);
+  top: 12%;
+  margin-top: 4px;
+  z-index: 50;
 }
 </style>

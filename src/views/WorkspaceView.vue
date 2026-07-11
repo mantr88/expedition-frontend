@@ -10,6 +10,7 @@ import ChannelSidebar from '../components/ChannelSidebar.vue'
 import MessageList from '../components/MessageList.vue'
 import MessageInput from '../components/MessageInput.vue'
 import MemberList from '../components/MemberList.vue'
+import ThreadPanel from '../components/ThreadPanel.vue'
 import { PhHash, PhLock, PhUsers, PhArrowClockwise } from '@phosphor-icons/vue'
 
 const channelsStore = useChannelsStore()
@@ -54,10 +55,10 @@ watch(
   },
 )
 
-async function handleSendMessage(text: string) {
+async function handleSendMessage(text: string, files: File[] = []) {
   if (channelsStore.currentChannelId !== null) {
     try {
-      await messagesStore.sendNewMessage(channelsStore.currentChannelId, text)
+      await messagesStore.sendNewMessage(channelsStore.currentChannelId, text, null, files)
     } catch (err) {
       console.error('Failed to send message:', err)
     }
@@ -128,7 +129,7 @@ const typingText = computed(() => {
 </script>
 
 <template>
-  <div :class="['workspace-layout', { 'show-members-panel': showMembers }]">
+  <div class="workspace-layout">
     <!-- Sidebar Panel (260px) -->
     <ChannelSidebar class="layout-sidebar" />
 
@@ -203,30 +204,28 @@ const typingText = computed(() => {
       v-if="showMembers && channelsStore.currentChannelId !== null"
       @close="showMembers = false"
     />
+
+    <!-- Thread Panel -->
+    <ThreadPanel v-if="messagesStore.activeThreadMessage" />
   </div>
 </template>
 
 <style scoped>
 .workspace-layout {
-  display: grid;
-  grid-template-columns: 260px 1fr;
+  display: flex;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  transition: grid-template-columns var(--dur-normal) var(--ease);
-}
-
-.workspace-layout.show-members-panel {
-  grid-template-columns: 260px 1fr 320px;
 }
 
 .layout-sidebar {
-  grid-column: 1;
+  width: 260px;
+  flex-shrink: 0;
   height: 100%;
 }
 
 .channel-area {
-  grid-column: 2;
+  flex: 1;
   display: flex;
   flex-direction: column;
   height: 100%;

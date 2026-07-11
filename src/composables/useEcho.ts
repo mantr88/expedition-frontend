@@ -116,6 +116,9 @@ export function useEcho() {
           privateChan.listen('.ChannelUpdated', (payload: Channel) => {
             channelsStore.handleChannelUpdated(payload)
           })
+          privateChan.listen('.ReactionToggled', (payload: { message_id: number; emoji: string; count: number; user_id: number }) => {
+            messagesStore.handleReactionToggled(channel.id, payload)
+          })
         }
       })
     },

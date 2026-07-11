@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { PhPaperPlaneTilt, PhPaperclip, PhSmiley, PhAt } from '@phosphor-icons/vue'
+import { PhPaperPlaneTilt, PhPaperclip, PhSmiley, PhAt, PhFile, PhX } from '@phosphor-icons/vue'
 import { useMentions } from '../composables/useMentions'
 import type { User } from '../types/User'
 
@@ -10,12 +10,17 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'send', text: string): void
+  (e: 'send', text: string, files: File[]): void
   (e: 'typing'): void
 }>()
 
 const text = ref('')
+const files = ref<File[]>([])
+const fileInputRef = ref<HTMLInputElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+const ALLOWED_EXTENSIONS = ['jpeg', 'jpg', 'png', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'zip']
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
 const {
   isMentioning,
@@ -25,6 +30,48 @@ const {
   navigateMentions,
   insertMention,
 } = useMentions()
+
+function addFiles(newFiles: FileList | File[]) {
+  for (let i = 0; i < newFiles.length; i++) {
+    const file = newFiles[i]
+    if (file.size > MAX_FILE_SIZE) {
+      alert(`Файл ${file.name} занадто великий (макс 5MB).`)
+      continue
+    }
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      alert(`Формат файлу ${file.name} не підтримується.`)
+      continue
+    }
+    files.value.push(file)
+  }
+}
+
+function removeFile(index: number) {
+  files.value.splice(index, 1)
+}
+
+function onFileInputChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  if (target.files) {
+    addFiles(target.files)
+  }
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
+
+function onDrop(e: DragEvent) {
+  if (props.disabled) return
+  if (e.dataTransfer?.files) {
+    addFiles(e.dataTransfer.files)
+  }
+}
+
+function onPaste(e: ClipboardEvent) {
+  if (props.disabled) return
+  if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
+    addFiles(e.clipboardData.files)
+  }
+}
 
 function handleKeyDown(e: KeyboardEvent) {
   if (isMentioning.value && mentionSuggestions.value.length > 0) {
@@ -69,17 +116,34 @@ function selectMention(user: User) {
 
 function submit() {
   const content = text.value.trim()
-  if (!content || props.disabled) return
+  if ((!content && files.value.length === 0) || props.disabled) return
 
-  emit('send', content)
+  emit('send', content, [...files.value])
   text.value = ''
+  files.value = []
   isMentioning.value = false
+}
+
+function openFileDialog() {
+  fileInputRef.value?.click()
+}
+
+function isImage(file: File) {
+  return file.type.startsWith('image/')
+}
+
+function getObjectURL(file: File) {
+  return URL.createObjectURL(file)
 }
 </script>
 
 <template>
   <div class="message-input-container">
-    <div class="input-wrapper">
+    <div 
+      class="input-wrapper"
+      @drop.prevent="onDrop"
+      @dragover.prevent
+    >
       <!-- Mentions Popup -->
       <div v-if="isMentioning && mentionSuggestions.length > 0" class="mentions-popup">
         <div
@@ -90,6 +154,29 @@ function submit() {
         >
           <div class="user-avatar-placeholder sm">{{ user.name.charAt(0) }}</div>
           <span class="mention-name">{{ user.name }}</span>
+        </div>
+      </div>
+
+      <input 
+        type="file" 
+        ref="fileInputRef" 
+        multiple 
+        style="display: none" 
+        @change="onFileInputChange"
+      />
+
+      <div v-if="files.length > 0" class="file-previews">
+        <div v-for="(file, index) in files" :key="index" class="file-preview-item">
+          <div v-if="isImage(file)" class="image-preview">
+            <img :src="getObjectURL(file)" :alt="file.name" />
+          </div>
+          <div v-else class="generic-preview">
+            <PhFile :size="24" />
+            <span class="file-name-sm">{{ file.name }}</span>
+          </div>
+          <button class="remove-file-btn" @click.stop="removeFile(index)">
+            <PhX :size="12" />
+          </button>
         </div>
       </div>
 
@@ -104,11 +191,12 @@ function submit() {
         @input="onTextareaInput"
         @click="onTextareaInput"
         @keyup="onTextareaInput"
+        @paste="onPaste"
       ></textarea>
 
       <div class="toolbar">
         <div class="toolbar-left">
-          <button class="tool-btn" type="button" aria-label="Додати файли" :disabled="disabled">
+          <button class="tool-btn" type="button" aria-label="Додати файли" :disabled="disabled" @click="openFileDialog">
             <PhPaperclip :size="20" />
           </button>
           <button class="tool-btn" type="button" aria-label="Додати емодзі" :disabled="disabled">
@@ -123,7 +211,7 @@ function submit() {
           class="send-btn"
           type="button"
           aria-label="Надіслати"
-          :disabled="!text.trim() || disabled"
+          :disabled="(!text.trim() && files.length === 0) || disabled"
           @click="submit"
         >
           <PhPaperPlaneTilt :size="20" />
@@ -152,6 +240,73 @@ function submit() {
 
 .input-wrapper:focus-within {
   border-color: var(--indigo-600);
+}
+
+.file-previews {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) 0 var(--space-3);
+  overflow-x: auto;
+}
+
+.file-preview-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-hover);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+}
+
+.generic-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  color: var(--text-secondary);
+}
+
+.file-name-sm {
+  font-size: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50px;
+}
+
+.remove-file-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-popover);
+}
+
+.remove-file-btn:hover {
+  background-color: var(--danger);
+  color: var(--text-onbrand);
+  border-color: var(--danger);
 }
 
 .message-textarea {

@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Message } from '../types/Message'
+import type { Message, Attachment } from '../types/Message'
 
 export interface FetchMessagesParams {
   before?: number
@@ -30,6 +30,16 @@ export async function fetchMessages(
   return response.data
 }
 
+export async function fetchReplies(
+  messageId: number,
+  params: { after?: number; limit?: number } = {},
+): Promise<PaginatedMessages> {
+  const response = await apiClient.get<PaginatedMessages>(`/api/messages/${messageId}/replies`, {
+    params,
+  })
+  return response.data
+}
+
 export async function sendMessage(
   channelId: number,
   payload: SendMessagePayload,
@@ -47,4 +57,27 @@ export async function editMessage(messageId: number, body: string): Promise<Mess
 
 export async function deleteMessage(messageId: number): Promise<void> {
   await apiClient.delete(`/api/messages/${messageId}`)
+}
+
+export interface ToggleReactionResponse {
+  action: 'added' | 'removed'
+  count: number
+}
+
+export async function toggleReaction(messageId: number, emoji: string): Promise<ToggleReactionResponse> {
+  const response = await apiClient.post<ToggleReactionResponse>(`/api/messages/${messageId}/reactions`, {
+    emoji,
+  })
+  return response.data
+}
+
+export async function uploadAttachment(channelId: number, messageId: number, file: File): Promise<Attachment> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await apiClient.post<Attachment>(`/api/channels/${channelId}/messages/${messageId}/attachments`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  return response.data
 }

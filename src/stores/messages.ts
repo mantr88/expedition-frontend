@@ -4,6 +4,9 @@ import {
   sendMessage as apiSendMessage,
   editMessage as apiEditMessage,
   deleteMessage as apiDeleteMessage,
+  toggleReaction as apiToggleReaction,
+  fetchReplies as apiFetchReplies,
+  uploadAttachment as apiUploadAttachment,
 } from '../api/messages'
 import type { Message } from '../types/Message'
 import { useAuthStore } from './auth'
@@ -19,6 +22,10 @@ interface MessagesState {
     }
   >
   loading: Record<number, boolean>
+  activeThreadMessage: Message | null
+  threadReplies: Message[]
+  threadPagination: { hasMore: boolean; nextCursor: number | null }
+  threadLoading: boolean
 }
 
 export const useMessagesStore = defineStore('messages', {
@@ -26,6 +33,10 @@ export const useMessagesStore = defineStore('messages', {
     messages: {},
     pagination: {},
     loading: {},
+    activeThreadMessage: null,
+    threadReplies: [],
+    threadPagination: { hasMore: false, nextCursor: null },
+    threadLoading: false,
   }),
 
   actions: {
@@ -44,7 +55,6 @@ export const useMessagesStore = defineStore('messages', {
         const currentMsgs = this.messages[channelId] ?? []
 
         if (options.loadMore) {
-          // Prepend older messages (returned sorted chronologically, so we append currentMsgs to them)
           this.messages[channelId] = [...result.data, ...currentMsgs]
         } else {
           this.messages[channelId] = result.data
@@ -62,7 +72,49 @@ export const useMessagesStore = defineStore('messages', {
       }
     },
 
-    async sendNewMessage(channelId: number, body: string) {
+    async openThread(message: Message) {
+      this.activeThreadMessage = message
+      this.threadReplies = []
+      this.threadPagination = { hasMore: false, nextCursor: null }
+      await this.loadReplies(message.id)
+    },
+
+    closeThread() {
+      this.activeThreadMessage = null
+      this.threadReplies = []
+    },
+
+    async loadReplies(messageId: number, options: { loadMore?: boolean } = {}) {
+      if (this.threadLoading) return
+
+      const pag = this.threadPagination
+      if (options.loadMore && pag && !pag.hasMore) return
+
+      this.threadLoading = true
+
+      try {
+        const after = options.loadMore && pag ? (pag.nextCursor ?? undefined) : undefined
+        const result = await apiFetchReplies(messageId, { after, limit: 50 })
+
+        if (options.loadMore) {
+          this.threadReplies = [...this.threadReplies, ...result.data]
+        } else {
+          this.threadReplies = result.data
+        }
+
+        this.threadPagination = {
+          hasMore: result.meta.has_more,
+          nextCursor: result.meta.next_cursor,
+        }
+      } catch (err) {
+        console.error('Failed to load replies:', err)
+        throw err
+      } finally {
+        this.threadLoading = false
+      }
+    },
+
+    async sendNewMessage(channelId: number, body: string, parentId: number | null = null, files: File[] = []) {
       const authStore = useAuthStore()
       if (!authStore.user) throw new Error('Not authenticated')
 
@@ -70,14 +122,14 @@ export const useMessagesStore = defineStore('messages', {
 
       // Optimistic message
       const optimisticMessage: Message = {
-        id: -Date.now(), // negative temporary ID
+        id: -Date.now(),
         client_message_id: clientMsgId,
         channel_id: channelId,
         user: authStore.user,
-        parent_id: null,
+        parent_id: parentId,
         body_raw: body,
-        body_html: body, // will be rendered as raw text initially
-        type: 'text',
+        body_html: body,
+        type: files.length > 0 ? 'file' : 'text',
         edited_at: null,
         deleted_at: null,
         created_at: new Date().toISOString(),
@@ -88,111 +140,221 @@ export const useMessagesStore = defineStore('messages', {
         sending: true,
       }
 
-      if (!this.messages[channelId]) {
-        this.messages[channelId] = []
+      if (parentId && this.activeThreadMessage?.id === parentId) {
+        this.threadReplies.push(optimisticMessage)
+      } else if (!parentId) {
+        if (!this.messages[channelId]) {
+          this.messages[channelId] = []
+        }
+        this.messages[channelId].push(optimisticMessage)
       }
-      this.messages[channelId].push(optimisticMessage)
 
       try {
         const realMessage = await apiSendMessage(channelId, {
           body,
           client_message_id: clientMsgId,
+          parent_id: parentId,
         })
 
-        // Replace optimistic message
-        const idx = this.messages[channelId].findIndex((m) => m.client_message_id === clientMsgId)
-        if (idx !== -1) {
-          this.messages[channelId][idx] = realMessage
+        if (files.length > 0) {
+          for (const file of files) {
+            const attachment = await apiUploadAttachment(channelId, realMessage.id, file)
+            realMessage.attachments.push(attachment)
+          }
+        }
+
+        if (parentId && this.activeThreadMessage?.id === parentId) {
+          const idx = this.threadReplies.findIndex((m) => m.client_message_id === clientMsgId)
+          if (idx !== -1) {
+            this.threadReplies[idx] = realMessage
+          }
+        } else if (!parentId) {
+          const idx = this.messages[channelId].findIndex((m) => m.client_message_id === clientMsgId)
+          if (idx !== -1) {
+            this.messages[channelId][idx] = realMessage
+          }
         }
       } catch (err) {
         console.error('Failed to send message:', err)
-        const idx = this.messages[channelId].findIndex((m) => m.client_message_id === clientMsgId)
-        if (idx !== -1) {
-          this.messages[channelId][idx].sending = false
-          this.messages[channelId][idx].failed = true
+        if (parentId && this.activeThreadMessage?.id === parentId) {
+          const idx = this.threadReplies.findIndex((m) => m.client_message_id === clientMsgId)
+          if (idx !== -1) {
+            this.threadReplies[idx].sending = false
+            this.threadReplies[idx].failed = true
+          }
+        } else if (!parentId) {
+          const idx = this.messages[channelId].findIndex((m) => m.client_message_id === clientMsgId)
+          if (idx !== -1) {
+            this.messages[channelId][idx].sending = false
+            this.messages[channelId][idx].failed = true
+          }
         }
         throw err
       }
     },
 
-    async editMessage(channelId: number, messageId: number, body: string) {
-      // Optimistic edit
-      const currentMsgs = this.messages[channelId] ?? []
-      const idx = currentMsgs.findIndex((m) => m.id === messageId)
-      let oldBody = ''
-      if (idx !== -1) {
-        oldBody = currentMsgs[idx].body_raw
-        currentMsgs[idx].body_raw = body
-        currentMsgs[idx].body_html = body
-        currentMsgs[idx].edited_at = new Date().toISOString()
+    async toggleReaction(channelId: number, messageId: number, emoji: string) {
+      // Optimistic update
+      const msg = this.findMessageAnywhere(channelId, messageId)
+      if (!msg) return
+
+      const reaction = msg.reactions.find((r) => r.emoji === emoji)
+      const previousState = reaction ? { ...reaction } : null
+
+      if (reaction) {
+        if (reaction.reacted_by_me) {
+          reaction.count = Math.max(0, reaction.count - 1)
+          reaction.reacted_by_me = false
+          if (reaction.count === 0) {
+            msg.reactions = msg.reactions.filter((r) => r.emoji !== emoji)
+          }
+        } else {
+          reaction.count++
+          reaction.reacted_by_me = true
+        }
+      } else {
+        msg.reactions.push({ emoji, count: 1, reacted_by_me: true })
       }
 
       try {
+        const result = await apiToggleReaction(messageId, emoji)
+        const currentMsg = this.findMessageAnywhere(channelId, messageId)
+        if (currentMsg) {
+          const idx = currentMsg.reactions.findIndex((r) => r.emoji === emoji)
+          if (result.count > 0) {
+            const updatedReaction = {
+              emoji,
+              count: result.count,
+              reacted_by_me: result.action === 'added',
+            }
+            if (idx !== -1) {
+              currentMsg.reactions[idx] = updatedReaction
+            } else {
+              currentMsg.reactions.push(updatedReaction)
+            }
+          } else if (idx !== -1) {
+            currentMsg.reactions.splice(idx, 1)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to toggle reaction', err)
+        const currentMsg = this.findMessageAnywhere(channelId, messageId)
+        if (currentMsg) {
+          // Revert optimistic update
+          if (previousState) {
+            const idx = currentMsg.reactions.findIndex((r) => r.emoji === emoji)
+            if (idx !== -1) {
+              currentMsg.reactions[idx] = previousState
+            } else {
+              currentMsg.reactions.push(previousState)
+            }
+          } else {
+            currentMsg.reactions = currentMsg.reactions.filter((r) => r.emoji !== emoji)
+          }
+        }
+      }
+    },
+
+    findMessageAnywhere(channelId: number, messageId: number): Message | undefined {
+      let msg = this.messages[channelId]?.find((m) => m.id === messageId)
+      if (!msg && this.activeThreadMessage?.id === messageId) {
+        msg = this.activeThreadMessage
+      }
+      if (!msg) {
+        msg = this.threadReplies.find((m) => m.id === messageId)
+      }
+      return msg
+    },
+
+    async editMessage(channelId: number, messageId: number, body: string) {
+      const msg = this.findMessageAnywhere(channelId, messageId)
+      if (!msg) return
+      
+      const oldBodyRaw = msg.body_raw
+      const oldBodyHtml = msg.body_html
+      
+      msg.body_raw = body
+      msg.body_html = body
+      msg.edited_at = new Date().toISOString()
+
+      try {
         const updatedMessage = await apiEditMessage(messageId, body)
-        if (idx !== -1) {
-          this.messages[channelId][idx] = updatedMessage
+        const currentMsg = this.findMessageAnywhere(channelId, messageId)
+        if (currentMsg) {
+          Object.assign(currentMsg, updatedMessage)
         }
       } catch (err) {
         console.error('Failed to edit message:', err)
-        // Rollback
-        if (idx !== -1) {
-          currentMsgs[idx].body_raw = oldBody
-          currentMsgs[idx].body_html = oldBody
-          currentMsgs[idx].edited_at = null
+        const currentMsg = this.findMessageAnywhere(channelId, messageId)
+        if (currentMsg) {
+          currentMsg.body_raw = oldBodyRaw
+          currentMsg.body_html = oldBodyHtml
+          currentMsg.edited_at = null
         }
         throw err
       }
     },
 
     async deleteMessage(channelId: number, messageId: number) {
-      // Optimistic delete
-      const currentMsgs = this.messages[channelId] ?? []
-      const idx = currentMsgs.findIndex((m) => m.id === messageId)
-      let oldDeletedAt: string | null = null
-      if (idx !== -1) {
-        oldDeletedAt = currentMsgs[idx].deleted_at
-        currentMsgs[idx].deleted_at = new Date().toISOString()
-      }
+      const msg = this.findMessageAnywhere(channelId, messageId)
+      if (!msg) return
+      
+      const oldDeletedAt = msg.deleted_at
+      msg.deleted_at = new Date().toISOString()
 
       try {
         await apiDeleteMessage(messageId)
-        // Set deleted_at for real
-        if (idx !== -1) {
-          currentMsgs[idx].deleted_at = new Date().toISOString()
-        }
       } catch (err) {
         console.error('Failed to delete message:', err)
-        // Rollback
-        if (idx !== -1) {
-          currentMsgs[idx].deleted_at = oldDeletedAt
+        const currentMsg = this.findMessageAnywhere(channelId, messageId)
+        if (currentMsg) {
+          currentMsg.deleted_at = oldDeletedAt
         }
         throw err
       }
     },
 
     handleMessageSent(channelId: number, message: Message) {
+      if (message.parent_id) {
+        // Handle thread reply
+        if (this.activeThreadMessage && this.activeThreadMessage.id === message.parent_id) {
+          const exists = this.threadReplies.some((m) => m.id === message.id)
+          if (!exists) {
+            const optIdx = this.threadReplies.findIndex((m) => m.client_message_id === message.client_message_id)
+            if (optIdx !== -1) {
+              this.threadReplies[optIdx] = message
+            } else {
+              this.threadReplies.push(message)
+              this.threadReplies.sort((a, b) => a.id - b.id)
+            }
+          }
+        }
+        // Update parent message reply_count and last_reply_at
+        const parentMsg = this.messages[channelId]?.find(m => m.id === message.parent_id)
+        if (parentMsg) {
+          parentMsg.reply_count = message.reply_count || (parentMsg.reply_count + 1)
+          parentMsg.last_reply_at = message.created_at
+        }
+        return
+      }
+
       if (!this.messages[channelId]) {
         this.messages[channelId] = []
       }
 
       const currentMsgs = this.messages[channelId]
 
-      // 1. Check if we already have this message by server ID
       const exists = currentMsgs.some((m) => m.id === message.id)
       if (exists) return
 
-      // 2. Check if we have an optimistic message with the same client_message_id
       const optIdx = currentMsgs.findIndex((m) => m.client_message_id === message.client_message_id)
 
       if (optIdx !== -1) {
-        // Replace optimistic message
         currentMsgs[optIdx] = message
       } else {
-        // Just push and sort (or push since it's newer)
         currentMsgs.push(message)
         currentMsgs.sort((a, b) => a.id - b.id)
 
-        // Increment unread count if it's not the active channel
         const channelsStore = useChannelsStore()
         if (channelsStore.currentChannelId !== channelId) {
           channelsStore.incrementUnread(channelId)
@@ -201,18 +363,35 @@ export const useMessagesStore = defineStore('messages', {
     },
 
     handleMessageUpdated(channelId: number, message: Message) {
-      const currentMsgs = this.messages[channelId] ?? []
-      const idx = currentMsgs.findIndex((m) => m.id === message.id)
-      if (idx !== -1) {
-        currentMsgs[idx] = message
+      const msg = this.findMessageAnywhere(channelId, message.id)
+      if (msg) {
+        Object.assign(msg, message)
       }
     },
 
     handleMessageDeleted(channelId: number, payload: { id: number; channel_id: number }) {
-      const currentMsgs = this.messages[channelId] ?? []
-      const idx = currentMsgs.findIndex((m) => m.id === payload.id)
-      if (idx !== -1) {
-        currentMsgs[idx].deleted_at = new Date().toISOString()
+      const msg = this.findMessageAnywhere(channelId, payload.id)
+      if (msg) {
+        msg.deleted_at = new Date().toISOString()
+      }
+    },
+    
+    handleReactionToggled(channelId: number, payload: { message_id: number; emoji: string; count: number; user_id: number }) {
+      const authStore = useAuthStore()
+      if (authStore.user?.id === payload.user_id) return // We already handled this via optimistic update
+      
+      const msg = this.findMessageAnywhere(channelId, payload.message_id)
+      if (!msg) return
+      
+      const idx = msg.reactions.findIndex((r) => r.emoji === payload.emoji)
+      if (payload.count > 0) {
+        if (idx !== -1) {
+          msg.reactions[idx].count = payload.count
+        } else {
+          msg.reactions.push({ emoji: payload.emoji, count: payload.count, reacted_by_me: false })
+        }
+      } else if (idx !== -1) {
+        msg.reactions.splice(idx, 1)
       }
     },
 
@@ -224,8 +403,6 @@ export const useMessagesStore = defineStore('messages', {
       this.loading[channelId] = true
 
       try {
-        // We load messages. Since we don't have an explicit ?after parameter,
-        // we fetch the latest 50 messages and do an idempotent merge.
         const result = await fetchMessages(channelId, { limit: 50 })
 
         const existingIds = new Set(currentMsgs.map((m) => m.id))
@@ -241,6 +418,10 @@ export const useMessagesStore = defineStore('messages', {
           this.messages[channelId] = [...currentMsgs, ...newMessagesToMerge].sort(
             (a, b) => a.id - b.id,
           )
+        }
+        
+        if (this.activeThreadMessage) {
+           await this.loadReplies(this.activeThreadMessage.id)
         }
       } catch (err) {
         console.error('Failed to sync messages on reconnect:', err)
