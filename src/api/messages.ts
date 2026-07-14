@@ -64,20 +64,34 @@ export interface ToggleReactionResponse {
   count: number
 }
 
-export async function toggleReaction(messageId: number, emoji: string): Promise<ToggleReactionResponse> {
-  const response = await apiClient.post<ToggleReactionResponse>(`/api/messages/${messageId}/reactions`, {
-    emoji,
-  })
+export async function toggleReaction(
+  messageId: number,
+  emoji: string,
+): Promise<ToggleReactionResponse> {
+  const response = await apiClient.post<ToggleReactionResponse>(
+    `/api/messages/${messageId}/reactions`,
+    {
+      emoji,
+    },
+  )
   return response.data
 }
 
-export async function uploadAttachment(channelId: number, messageId: number, file: File): Promise<Attachment> {
+export async function uploadAttachment(
+  channelId: number,
+  messageId: number,
+  file: File,
+): Promise<Attachment> {
   const formData = new FormData()
   formData.append('file', file)
-  const response = await apiClient.post<Attachment>(`/api/channels/${channelId}/messages/${messageId}/attachments`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
+  const response = await apiClient.post<Attachment>(
+    `/api/channels/${channelId}/messages/${messageId}/attachments`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     },
-  })
+  )
   return response.data
 }

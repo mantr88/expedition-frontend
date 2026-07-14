@@ -8,12 +8,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="emoji-picker">
-    <button
-      v-for="emoji in EMOJIS"
-      :key="emoji"
-      class="emoji-btn"
-      @click="emit('select', emoji)"
-    >
+    <button v-for="emoji in EMOJIS" :key="emoji" class="emoji-btn" @click="emit('select', emoji)">
       {{ emoji }}
     </button>
   </div>

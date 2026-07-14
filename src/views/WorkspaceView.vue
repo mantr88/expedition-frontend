@@ -11,7 +11,8 @@ import MessageList from '../components/MessageList.vue'
 import MessageInput from '../components/MessageInput.vue'
 import MemberList from '../components/MemberList.vue'
 import ThreadPanel from '../components/ThreadPanel.vue'
-import { PhHash, PhLock, PhUsers, PhArrowClockwise } from '@phosphor-icons/vue'
+import SearchModal from '../components/SearchModal.vue'
+import { PhHash, PhLock, PhUsers, PhArrowClockwise, PhMagnifyingGlass } from '@phosphor-icons/vue'
 
 const channelsStore = useChannelsStore()
 const messagesStore = useMessagesStore()
@@ -25,6 +26,7 @@ const { sendTypingWhisper } = useTyping()
 
 const loadingOlder = ref(false)
 const showMembers = ref(false)
+const showSearch = ref(false)
 
 onMounted(async () => {
   try {
@@ -153,6 +155,14 @@ const typingText = computed(() => {
 
         <div class="header-right">
           <button
+            class="refetch-btn"
+            aria-label="Пошук повідомлень (Ctrl+K)"
+            @click="showSearch = true"
+          >
+            <PhMagnifyingGlass :size="18" />
+          </button>
+
+          <button
             :class="['members-badge', { active: showMembers }]"
             aria-label="Показати учасників"
             @click="showMembers = !showMembers"
@@ -207,6 +217,9 @@ const typingText = computed(() => {
 
     <!-- Thread Panel -->
     <ThreadPanel v-if="messagesStore.activeThreadMessage" />
+
+    <!-- Search Modal -->
+    <SearchModal :open="showSearch" @close="showSearch = false" />
   </div>
 </template>
 

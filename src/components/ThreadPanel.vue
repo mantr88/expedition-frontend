@@ -28,7 +28,7 @@ async function sendReply(text: string, files: File[]) {
     activeThreadMessage.value.channel_id,
     text,
     activeThreadMessage.value.id,
-    files
+    files,
   )
 }
 
@@ -54,7 +54,7 @@ function onDelete(messageId: number) {
         <PhX :size="20" />
       </button>
     </div>
-    
+
     <div class="thread-content">
       <div class="parent-message">
         <MessageItem
@@ -64,7 +64,7 @@ function onDelete(messageId: number) {
           @delete="onDelete"
         />
       </div>
-      
+
       <div class="replies-divider">
         <span class="divider-line"></span>
         <span class="divider-text mono">{{ activeThreadMessage.reply_count }} відповідей</span>
@@ -82,10 +82,7 @@ function onDelete(messageId: number) {
     </div>
 
     <div class="thread-input">
-      <MessageInput
-        placeholder="Відповісти в треді..."
-        @send="sendReply"
-      />
+      <MessageInput placeholder="Відповісти в треді..." @send="sendReply" />
     </div>
   </div>
 </template>

@@ -5,6 +5,7 @@ import type { Message } from '../types/Message'
 import MessageItem from './MessageItem.vue'
 import { useInfiniteScroll } from '../composables/useInfiniteScroll'
 import { useChannelsStore } from '../stores/channels'
+import { useMessagesStore } from '../stores/messages'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -25,9 +26,28 @@ const vListRef = ref<null | {
 const { handleScrollUp } = useInfiniteScroll()
 
 const channelsStore = useChannelsStore()
+const messagesStore = useMessagesStore()
 const lastReadMessageId = computed(() => {
   return channelsStore.activeChannel?.my_membership?.last_read_message_id ?? Number.MAX_SAFE_INTEGER
 })
+
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  () => messagesStore.highlightMessageId,
+  (id) => {
+    if (id === null) return
+    nextTick(() => {
+      const index = props.messages.findIndex((m) => m.id === id)
+      if (index !== -1 && vListRef.value?.scrollToIndex) {
+        vListRef.value.scrollToIndex(index)
+      }
+    })
+    if (highlightTimer) clearTimeout(highlightTimer)
+    highlightTimer = setTimeout(() => messagesStore.clearHighlight(), 2500)
+  },
+  { immediate: true },
+)
 
 function checkConsecutive(msg: Message, index: number) {
   if (index === 0) return false
@@ -117,6 +137,7 @@ function onDelete(messageId: number) {
           :key="msg.id"
           :message="msg"
           :is-consecutive="checkConsecutive(msg, index)"
+          :highlighted="msg.id === messagesStore.highlightMessageId"
           @edit="onEdit"
           @delete="onDelete"
         />

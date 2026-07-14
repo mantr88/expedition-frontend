@@ -382,4 +382,37 @@ export const handlers = [
     msg.deleted_at = new Date().toISOString()
     return new HttpResponse(null, { status: 204 })
   }),
+
+  // Search endpoint
+  http.get('*/api/search/messages', ({ request }) => {
+    if (!isAuthenticated) {
+      return HttpResponse.json({ message: 'Unauthenticated' }, { status: 401 })
+    }
+    const url = new URL(request.url)
+    const q = (url.searchParams.get('q') || '').toLowerCase().trim()
+    const channelIdParam = url.searchParams.get('channel_id')
+
+    if (!q) {
+      return HttpResponse.json({ data: [], meta: { total: 0 } })
+    }
+
+    let results = messages.filter((m) => !m.deleted_at && m.body_raw.toLowerCase().includes(q))
+    if (channelIdParam) {
+      results = results.filter((m) => m.channel_id === Number(channelIdParam))
+    }
+    // Найновіші перші, максимум 20
+    results = [...results].sort((a, b) => b.id - a.id).slice(0, 20)
+
+    const data = results.map((m) => {
+      const channel = channels.find((c) => c.id === m.channel_id)
+      return {
+        ...m,
+        channel: channel
+          ? { id: channel.id, name: channel.name, type: channel.type }
+          : { id: m.channel_id, name: 'невідомий', type: 'public' },
+      }
+    })
+
+    return HttpResponse.json({ data, meta: { total: data.length } })
+  }),
 ]

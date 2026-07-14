@@ -19,7 +19,20 @@ const files = ref<File[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
-const ALLOWED_EXTENSIONS = ['jpeg', 'jpg', 'png', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'zip']
+const ALLOWED_EXTENSIONS = [
+  'jpeg',
+  'jpg',
+  'png',
+  'gif',
+  'webp',
+  'pdf',
+  'txt',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'zip',
+]
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
 const {
@@ -139,11 +152,7 @@ function getObjectURL(file: File) {
 
 <template>
   <div class="message-input-container">
-    <div 
-      class="input-wrapper"
-      @drop.prevent="onDrop"
-      @dragover.prevent
-    >
+    <div class="input-wrapper" @drop.prevent="onDrop" @dragover.prevent>
       <!-- Mentions Popup -->
       <div v-if="isMentioning && mentionSuggestions.length > 0" class="mentions-popup">
         <div
@@ -157,11 +166,11 @@ function getObjectURL(file: File) {
         </div>
       </div>
 
-      <input 
-        type="file" 
-        ref="fileInputRef" 
-        multiple 
-        style="display: none" 
+      <input
+        type="file"
+        ref="fileInputRef"
+        multiple
+        style="display: none"
         @change="onFileInputChange"
       />
 
@@ -196,7 +205,13 @@ function getObjectURL(file: File) {
 
       <div class="toolbar">
         <div class="toolbar-left">
-          <button class="tool-btn" type="button" aria-label="Додати файли" :disabled="disabled" @click="openFileDialog">
+          <button
+            class="tool-btn"
+            type="button"
+            aria-label="Додати файли"
+            :disabled="disabled"
+            @click="openFileDialog"
+          >
             <PhPaperclip :size="20" />
           </button>
           <button class="tool-btn" type="button" aria-label="Додати емодзі" :disabled="disabled">
