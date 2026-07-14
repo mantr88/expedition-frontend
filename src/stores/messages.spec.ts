@@ -85,4 +85,18 @@ describe('messages store: jumpToMessage', () => {
     await store.jumpToMessage(1, 99999)
     expect(store.highlightMessageId).toBeNull()
   })
+
+  it('скидає highlightMessageId і прокидає помилку, якщо завантаження впало', async () => {
+    const channelsStore = useChannelsStore()
+    channelsStore.channels = [
+      { id: 1, name: 'general', type: 'public', topic: null, archived_at: null, members_count: 1 },
+    ]
+    channelsStore.members[1] = []
+
+    vi.mocked(messagesApi.fetchMessages).mockRejectedValue(new Error('network down'))
+
+    const store = useMessagesStore()
+    await expect(store.jumpToMessage(1, 10)).rejects.toThrow('network down')
+    expect(store.highlightMessageId).toBeNull()
+  })
 })

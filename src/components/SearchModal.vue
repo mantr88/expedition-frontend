@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { searchMessages, type SearchResult } from '../api/search'
 import { getRetryAfterSeconds } from '../api/client'
 import { useMessagesStore } from '../stores/messages'
+import { useToastsStore } from '../stores/toasts'
 import { PhMagnifyingGlass, PhHash, PhChat } from '@phosphor-icons/vue'
 
 const props = defineProps<{ open: boolean }>()
@@ -58,6 +59,8 @@ async function runSearch() {
       const seconds = getRetryAfterSeconds(err)
       cooldownUntil.value = Date.now() + seconds * 1000
       cooldownText.value = `Забагато запитів пошуку. Повторіть через ${seconds} с.`
+    } else {
+      useToastsStore().push('error', 'Пошук не виконано. Перевірте зʼєднання і спробуйте ще раз.')
     }
   } finally {
     loading.value = false
@@ -66,7 +69,11 @@ async function runSearch() {
 
 async function openResult(result: SearchResult) {
   emit('close')
-  await messagesStore.jumpToMessage(result.channel.id, result.id)
+  try {
+    await messagesStore.jumpToMessage(result.channel.id, result.id)
+  } catch {
+    useToastsStore().push('error', 'Не вдалося відкрити повідомлення. Спробуйте ще раз.')
+  }
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -75,6 +82,10 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   if (props.open) inputRef.value?.focus()
+})
+
+onUnmounted(() => {
+  if (debounceTimer) clearTimeout(debounceTimer)
 })
 </script>
 

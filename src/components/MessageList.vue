@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { VList } from 'virtua/vue'
 import type { Message } from '../types/Message'
 import MessageItem from './MessageItem.vue'
@@ -34,12 +34,14 @@ const lastReadMessageId = computed(() => {
 let highlightTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(
-  () => messagesStore.highlightMessageId,
-  (id) => {
+  [() => messagesStore.highlightMessageId, () => props.messages.length],
+  ([id]) => {
     if (id === null) return
+    const index = props.messages.findIndex((m) => m.id === id)
+    if (index === -1) return
+
     nextTick(() => {
-      const index = props.messages.findIndex((m) => m.id === id)
-      if (index !== -1 && vListRef.value?.scrollToIndex) {
+      if (vListRef.value?.scrollToIndex) {
         vListRef.value.scrollToIndex(index)
       }
     })
@@ -48,6 +50,10 @@ watch(
   },
   { immediate: true },
 )
+
+onUnmounted(() => {
+  if (highlightTimer) clearTimeout(highlightTimer)
+})
 
 function checkConsecutive(msg: Message, index: number) {
   if (index === 0) return false
@@ -79,6 +85,7 @@ watch(
   () => props.messages,
   (newMsgs, oldMsgs) => {
     if (!newMsgs || newMsgs.length === 0) return
+    if (messagesStore.highlightMessageId !== null) return
 
     // If channel changed or we sent a message (first message ID is same)
     if (

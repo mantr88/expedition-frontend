@@ -3,6 +3,7 @@ import { mount, flushPromises, DOMWrapper } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import SearchModal from './SearchModal.vue'
 import * as searchApi from '../api/search'
+import { useToastsStore } from '../stores/toasts'
 
 // Компонент рендериться через Teleport to="body", тому DOM-вузли не є
 // нащадками wrapper.element — шукаємо їх напряму в document.body.
@@ -66,6 +67,24 @@ describe('SearchModal', () => {
     const wrapper = mount(SearchModal, { props: { open: true } })
     await body().find('.search-overlay').trigger('keydown', { key: 'Escape' })
     expect(wrapper.emitted('close')).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('показує тост-помилку при не-429 збої пошуку', async () => {
+    vi.mocked(searchApi.searchMessages).mockRejectedValue({
+      response: { status: 500 },
+    })
+
+    const wrapper = mount(SearchModal, { props: { open: true } })
+    const toastsStore = useToastsStore()
+
+    await body().find('input').setValue('помилка')
+    await vi.advanceTimersByTimeAsync(350)
+    await flushPromises()
+
+    expect(searchApi.searchMessages).toHaveBeenCalledWith('помилка')
+    expect(toastsStore.toasts).toHaveLength(1)
+    expect(toastsStore.toasts[0].kind).toBe('error')
     wrapper.unmount()
   })
 })

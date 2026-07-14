@@ -443,34 +443,39 @@ export const useMessagesStore = defineStore('messages', {
     },
 
     async jumpToMessage(channelId: number, messageId: number) {
-      const channelsStore = useChannelsStore()
-      if (channelsStore.currentChannelId !== channelId) {
-        await channelsStore.selectChannel(channelId)
-      }
+      this.highlightMessageId = messageId
 
-      // WorkspaceView watcher може вже вантажити цей канал — дочекатись
-      await this.waitForIdle(channelId)
+      try {
+        const channelsStore = useChannelsStore()
+        if (channelsStore.currentChannelId !== channelId) {
+          await channelsStore.selectChannel(channelId)
+        }
 
-      if (!this.messages[channelId] || this.messages[channelId].length === 0) {
-        await this.loadMessages(channelId)
-      }
-
-      let attempts = 0
-      const MAX_PAGES = 20
-      while (
-        !this.messages[channelId]?.some((m) => m.id === messageId) &&
-        this.pagination[channelId]?.hasMore &&
-        attempts < MAX_PAGES
-      ) {
-        await this.loadMessages(channelId, { loadMore: true })
+        // WorkspaceView watcher може вже вантажити цей канал — дочекатись
         await this.waitForIdle(channelId)
-        attempts++
-      }
 
-      if (this.messages[channelId]?.some((m) => m.id === messageId)) {
-        this.highlightMessageId = messageId
-      } else {
+        if (!this.messages[channelId] || this.messages[channelId].length === 0) {
+          await this.loadMessages(channelId)
+        }
+
+        let attempts = 0
+        const MAX_PAGES = 20
+        while (
+          !this.messages[channelId]?.some((m) => m.id === messageId) &&
+          this.pagination[channelId]?.hasMore &&
+          attempts < MAX_PAGES
+        ) {
+          await this.loadMessages(channelId, { loadMore: true })
+          await this.waitForIdle(channelId)
+          attempts++
+        }
+
+        if (!this.messages[channelId]?.some((m) => m.id === messageId)) {
+          this.highlightMessageId = null
+        }
+      } catch (err) {
         this.highlightMessageId = null
+        throw err
       }
     },
 
