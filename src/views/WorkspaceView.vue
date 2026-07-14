@@ -12,6 +12,7 @@ import MessageInput from '../components/MessageInput.vue'
 import MemberList from '../components/MemberList.vue'
 import ThreadPanel from '../components/ThreadPanel.vue'
 import SearchModal from '../components/SearchModal.vue'
+import ChannelNotificationsMenu from '../components/ChannelNotificationsMenu.vue'
 import { PhHash, PhLock, PhUsers, PhArrowClockwise, PhMagnifyingGlass } from '@phosphor-icons/vue'
 
 const channelsStore = useChannelsStore()
@@ -154,6 +155,8 @@ const typingText = computed(() => {
         </div>
 
         <div class="header-right">
+          <ChannelNotificationsMenu />
+
           <button
             class="refetch-btn"
             aria-label="Пошук повідомлень (Ctrl+K)"

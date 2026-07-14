@@ -1,5 +1,7 @@
 import type { User } from './User'
 
+export type NotificationsLevel = 'all' | 'mentions' | 'mute'
+
 export interface Channel {
   id: number
   name: string
@@ -11,7 +13,7 @@ export interface Channel {
   my_membership?: {
     role: 'owner' | 'admin' | 'member'
     last_read_message_id: number | null
-    notifications_level: 'all' | 'mentions' | 'mute'
+    notifications_level: NotificationsLevel
   }
 }
 
@@ -19,5 +21,5 @@ export interface ChannelMember {
   user: User
   role: 'owner' | 'admin' | 'member'
   last_read_message_id: number | null
-  notifications_level: 'all' | 'mentions' | 'mute'
+  notifications_level: NotificationsLevel
 }

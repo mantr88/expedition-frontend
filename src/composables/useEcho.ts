@@ -69,6 +69,8 @@ export function useEcho() {
       if (newUserId) {
         const userChan = echo.private(`user.${newUserId}`)
         userChan.listen('.Mentioned', (payload: { message: Message; channel: Channel }) => {
+          const current = channelsStore.channels.find((c) => c.id === payload.channel.id)
+          if (current?.my_membership?.notifications_level === 'mute') return
           notificationsStore.showNotification(`Нова згадка у ${payload.channel.name}`, {
             body: payload.message.body_raw,
           })
@@ -102,9 +104,13 @@ export function useEcho() {
               channelsStore.markAsRead(channel.id, payload.id)
             } else if (channel.type === 'dm') {
               // Show notification for DM if it's not the active channel
-              notificationsStore.showNotification(`Нове повідомлення від ${channel.name}`, {
-                body: payload.body_raw,
-              })
+              const current = channelsStore.channels.find((c) => c.id === channel.id)
+              const level = current?.my_membership?.notifications_level ?? 'all'
+              if (level === 'all') {
+                notificationsStore.showNotification(`Нове повідомлення від ${channel.name}`, {
+                  body: payload.body_raw,
+                })
+              }
             }
           })
           privateChan.listen('.MessageUpdated', (payload: Message) => {

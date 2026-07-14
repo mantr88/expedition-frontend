@@ -383,6 +383,20 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  http.put('*/api/channels/:channelId/notifications', async ({ request, params }) => {
+    if (!isAuthenticated) {
+      return HttpResponse.json({ message: 'Unauthenticated' }, { status: 401 })
+    }
+    const channelId = Number(params.channelId)
+    const body = (await request.json()) as { notifications_level: 'all' | 'mentions' | 'mute' }
+    const channel = channels.find((c) => c.id === channelId)
+    if (!channel || !channel.my_membership) {
+      return HttpResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+    channel.my_membership.notifications_level = body.notifications_level
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   // Search endpoint
   http.get('*/api/search/messages', ({ request }) => {
     if (!isAuthenticated) {
