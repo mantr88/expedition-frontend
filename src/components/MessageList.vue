@@ -118,7 +118,7 @@ function onDelete(messageId: number) {
 </script>
 
 <template>
-  <div class="message-list-container">
+  <div class="message-list-container" role="log" aria-label="Повідомлення" :aria-busy="loading">
     <div v-if="loading && messages.length === 0" class="loading-state">
       <span class="spinner"></span>
       Завантаження повідомлень...

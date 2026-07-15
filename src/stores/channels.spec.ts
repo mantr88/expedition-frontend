@@ -44,3 +44,23 @@ describe('channels store: setNotificationsLevel', () => {
     expect(store.channels[0].my_membership!.notifications_level).toBe('all')
   })
 })
+
+describe('channels store: keyboard navigation', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('selectNextChannel циклічно перемикає', async () => {
+    const store = useChannelsStore()
+    store.channels = [makeChannel(), { ...makeChannel(), id: 2, name: 'design' }]
+    store.members[1] = []
+    store.members[2] = []
+    store.currentChannelId = 2
+
+    store.selectNextChannel()
+    expect(store.currentChannelId).toBe(1)
+    store.selectPrevChannel()
+    expect(store.currentChannelId).toBe(2)
+  })
+})

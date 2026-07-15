@@ -107,10 +107,16 @@ async function startDirectMessage(userId: number) {
         </button>
       </div>
 
+      <div v-if="channelsStore.error" class="sidebar-error">
+        <p>{{ channelsStore.error }}</p>
+        <button class="retry-btn" @click="channelsStore.loadChannels()">Повторити</button>
+      </div>
+
       <div class="channel-list">
-        <div
+        <button
           v-for="channel in channelsStore.publicChannels"
           :key="channel.id"
+          type="button"
           :class="[
             'channel-item',
             {
@@ -126,10 +132,14 @@ async function startDirectMessage(userId: number) {
             class="channel-icon"
           />
           <span class="channel-name">{{ channel.name }}</span>
-          <span v-if="channel.unread_count && channel.unread_count > 0" class="unread-badge">
+          <span
+            v-if="channel.unread_count && channel.unread_count > 0"
+            class="unread-badge"
+            :aria-label="`${channel.unread_count} непрочитаних`"
+          >
             {{ channel.unread_count }}
           </span>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -142,9 +152,10 @@ async function startDirectMessage(userId: number) {
       </div>
 
       <div class="channel-list">
-        <div
+        <button
           v-for="channel in channelsStore.directMessages"
           :key="channel.id"
+          type="button"
           :class="[
             'channel-item',
             {
@@ -156,10 +167,14 @@ async function startDirectMessage(userId: number) {
         >
           <PhChat :size="16" class="channel-icon" />
           <span class="channel-name">{{ channel.name }}</span>
-          <span v-if="channel.unread_count && channel.unread_count > 0" class="unread-badge">
+          <span
+            v-if="channel.unread_count && channel.unread_count > 0"
+            class="unread-badge"
+            :aria-label="`${channel.unread_count} непрочитаних`"
+          >
             {{ channel.unread_count }}
           </span>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -354,6 +369,11 @@ async function startDirectMessage(userId: number) {
 }
 
 .channel-item {
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
   display: flex;
   align-items: center;
   height: 32px;
@@ -595,6 +615,26 @@ async function startDirectMessage(userId: number) {
 .channel-item.unread .channel-name {
   font-weight: 500;
   color: var(--text-primary);
+}
+
+.sidebar-error {
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.retry-btn {
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  color: var(--text-primary);
+  margin-top: var(--space-1);
+}
+
+.retry-btn:hover {
+  background-color: var(--bg-hover);
 }
 
 .dm-results {

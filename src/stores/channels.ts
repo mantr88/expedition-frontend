@@ -153,5 +153,20 @@ export const useChannelsStore = defineStore('channels', {
         throw err
       }
     },
+
+    selectNextChannel() {
+      this.selectSibling(1)
+    },
+
+    selectPrevChannel() {
+      this.selectSibling(-1)
+    },
+
+    selectSibling(offset: number) {
+      if (this.channels.length === 0) return
+      const idx = this.channels.findIndex((c) => c.id === this.currentChannelId)
+      const next = (idx + offset + this.channels.length) % this.channels.length
+      this.selectChannel(this.channels[next].id)
+    },
   },
 })

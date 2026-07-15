@@ -5,8 +5,10 @@ import { useMessagesStore } from '../stores/messages'
 import { usePresenceStore } from '../stores/presence'
 import { useNotificationsStore } from '../stores/notifications'
 import { useUiStore } from '../stores/ui'
+import { useToastsStore } from '../stores/toasts'
 import { useEcho } from '../composables/useEcho'
 import { useTyping } from '../composables/useTyping'
+import { useKeyboardShortcuts } from '../composables/useKeyboardShortcuts'
 import ChannelSidebar from '../components/ChannelSidebar.vue'
 import MessageList from '../components/MessageList.vue'
 import MessageInput from '../components/MessageInput.vue'
@@ -28,6 +30,7 @@ const messagesStore = useMessagesStore()
 const presenceStore = usePresenceStore()
 const notificationsStore = useNotificationsStore()
 const uiStore = useUiStore()
+const toastsStore = useToastsStore()
 
 // Initialize Laravel Echo / Reverb integration
 useEcho()
@@ -37,6 +40,17 @@ const { sendTypingWhisper } = useTyping()
 const loadingOlder = ref(false)
 const showMembers = ref(false)
 const showSearch = ref(false)
+
+useKeyboardShortcuts({
+  openSearch: () => (showSearch.value = true),
+  nextChannel: () => channelsStore.selectNextChannel(),
+  prevChannel: () => channelsStore.selectPrevChannel(),
+  closeOverlays: () => {
+    showSearch.value = false
+    showMembers.value = false
+    if (messagesStore.activeThreadMessage) messagesStore.closeThread()
+  },
+})
 
 onMounted(async () => {
   try {
@@ -73,6 +87,10 @@ async function handleSendMessage(text: string, files: File[] = []) {
       await messagesStore.sendNewMessage(channelsStore.currentChannelId, text, null, files)
     } catch (err) {
       console.error('Failed to send message:', err)
+      toastsStore.push(
+        'error',
+        'Повідомлення не надіслано. Натисніть «Повторити» біля повідомлення.',
+      )
     }
   }
 }
@@ -84,6 +102,7 @@ async function handleLoadOlder() {
       await messagesStore.loadMessages(channelsStore.currentChannelId, { loadMore: true })
     } catch (err) {
       console.error('Failed to load older messages:', err)
+      toastsStore.push('error', 'Не вдалося завантажити старіші повідомлення.')
     } finally {
       loadingOlder.value = false
     }
