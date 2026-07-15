@@ -3,12 +3,14 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChannelsStore } from '../stores/channels'
 import { useAuthStore } from '../stores/auth'
+import { useUiStore } from '../stores/ui'
 import { searchUsers } from '../api/users'
 import type { User } from '../types/User'
-import { PhHash, PhLock, PhPlus, PhSignOut, PhChat } from '@phosphor-icons/vue'
+import { PhHash, PhLock, PhPlus, PhSignOut, PhChat, PhMoon, PhSun } from '@phosphor-icons/vue'
 
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 const router = useRouter()
 
 const showModal = ref(false)
@@ -38,6 +40,11 @@ async function handleCreateChannel() {
     const error = err as { response?: { data?: { message?: string } } }
     errorMsg.value = error.response?.data?.message || 'Не вдалося створити канал'
   }
+}
+
+function handleSelectChannel(channelId: number) {
+  channelsStore.selectChannel(channelId)
+  uiStore.sidebarOpen = false
 }
 
 async function handleLogout() {
@@ -72,6 +79,7 @@ async function startDirectMessage(userId: number) {
     showDmModal.value = false
     dmSearchQuery.value = ''
     dmSearchResults.value = []
+    uiStore.sidebarOpen = false
   } catch (err) {
     console.error('Failed to start DM', err)
   }
@@ -82,6 +90,13 @@ async function startDirectMessage(userId: number) {
   <aside class="sidebar">
     <div class="sidebar-header">
       <span class="workspace-title">Expedition Workspace</span>
+      <button
+        class="theme-btn"
+        :aria-label="uiStore.theme === 'dark' ? 'Світла тема' : 'Темна тема'"
+        @click="uiStore.toggleTheme()"
+      >
+        <component :is="uiStore.theme === 'dark' ? PhSun : PhMoon" :size="16" />
+      </button>
     </div>
 
     <div class="sidebar-section">
@@ -92,10 +107,16 @@ async function startDirectMessage(userId: number) {
         </button>
       </div>
 
+      <div v-if="channelsStore.error" class="sidebar-error">
+        <p>{{ channelsStore.error }}</p>
+        <button class="retry-btn" @click="channelsStore.loadChannels()">Повторити</button>
+      </div>
+
       <div class="channel-list">
-        <div
+        <button
           v-for="channel in channelsStore.publicChannels"
           :key="channel.id"
+          type="button"
           :class="[
             'channel-item',
             {
@@ -103,7 +124,7 @@ async function startDirectMessage(userId: number) {
               unread: channel.unread_count && channel.unread_count > 0,
             },
           ]"
-          @click="channelsStore.selectChannel(channel.id)"
+          @click="handleSelectChannel(channel.id)"
         >
           <component
             :is="channel.type === 'private' ? PhLock : PhHash"
@@ -111,10 +132,14 @@ async function startDirectMessage(userId: number) {
             class="channel-icon"
           />
           <span class="channel-name">{{ channel.name }}</span>
-          <span v-if="channel.unread_count && channel.unread_count > 0" class="unread-badge">
+          <span
+            v-if="channel.unread_count && channel.unread_count > 0"
+            class="unread-badge"
+            :aria-label="`${channel.unread_count} непрочитаних`"
+          >
             {{ channel.unread_count }}
           </span>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -127,9 +152,10 @@ async function startDirectMessage(userId: number) {
       </div>
 
       <div class="channel-list">
-        <div
+        <button
           v-for="channel in channelsStore.directMessages"
           :key="channel.id"
+          type="button"
           :class="[
             'channel-item',
             {
@@ -137,14 +163,18 @@ async function startDirectMessage(userId: number) {
               unread: channel.unread_count && channel.unread_count > 0,
             },
           ]"
-          @click="channelsStore.selectChannel(channel.id)"
+          @click="handleSelectChannel(channel.id)"
         >
           <PhChat :size="16" class="channel-icon" />
           <span class="channel-name">{{ channel.name }}</span>
-          <span v-if="channel.unread_count && channel.unread_count > 0" class="unread-badge">
+          <span
+            v-if="channel.unread_count && channel.unread_count > 0"
+            class="unread-badge"
+            :aria-label="`${channel.unread_count} непрочитаних`"
+          >
             {{ channel.unread_count }}
           </span>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -266,8 +296,26 @@ async function startDirectMessage(userId: number) {
   height: 56px;
   padding: 0 var(--space-4);
   display: flex;
+  justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.theme-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.theme-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .workspace-title {
@@ -321,6 +369,11 @@ async function startDirectMessage(userId: number) {
 }
 
 .channel-item {
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
   display: flex;
   align-items: center;
   height: 32px;
@@ -562,6 +615,26 @@ async function startDirectMessage(userId: number) {
 .channel-item.unread .channel-name {
   font-weight: 500;
   color: var(--text-primary);
+}
+
+.sidebar-error {
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.retry-btn {
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  color: var(--text-primary);
+  margin-top: var(--space-1);
+}
+
+.retry-btn:hover {
+  background-color: var(--bg-hover);
 }
 
 .dm-results {

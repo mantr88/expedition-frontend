@@ -28,7 +28,7 @@ function formatSize(bytes: number) {
         <span class="file-name mono">{{ attachment.original_name }}</span>
       </div>
     </div>
-    
+
     <div v-else class="file-preview">
       <div class="file-icon">
         <PhFile :size="32" weight="regular" />
@@ -52,7 +52,9 @@ function formatSize(bytes: number) {
   border: 1px solid var(--border-subtle);
   text-decoration: none;
   background-color: var(--bg-elevated);
-  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
   width: fit-content;
   max-width: 320px;
 }
@@ -86,7 +88,7 @@ function formatSize(bytes: number) {
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(transparent, rgba(0,0,0,0.6));
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
   padding: var(--space-2);
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease);
@@ -146,7 +148,9 @@ function formatSize(bytes: number) {
 .download-icon {
   color: var(--text-muted);
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .attachment-card:hover .download-icon {

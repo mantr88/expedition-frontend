@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { VList } from 'virtua/vue'
 import type { Message } from '../types/Message'
 import MessageItem from './MessageItem.vue'
 import { useInfiniteScroll } from '../composables/useInfiniteScroll'
 import { useChannelsStore } from '../stores/channels'
+import { useMessagesStore } from '../stores/messages'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -25,8 +26,33 @@ const vListRef = ref<null | {
 const { handleScrollUp } = useInfiniteScroll()
 
 const channelsStore = useChannelsStore()
+const messagesStore = useMessagesStore()
 const lastReadMessageId = computed(() => {
   return channelsStore.activeChannel?.my_membership?.last_read_message_id ?? Number.MAX_SAFE_INTEGER
+})
+
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  [() => messagesStore.highlightMessageId, () => props.messages],
+  ([id]) => {
+    if (id === null) return
+    const index = props.messages.findIndex((m) => m.id === id)
+    if (index === -1) return
+
+    nextTick(() => {
+      if (vListRef.value?.scrollToIndex) {
+        vListRef.value.scrollToIndex(index)
+      }
+    })
+    if (highlightTimer) clearTimeout(highlightTimer)
+    highlightTimer = setTimeout(() => messagesStore.clearHighlight(), 2500)
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  if (highlightTimer) clearTimeout(highlightTimer)
 })
 
 function checkConsecutive(msg: Message, index: number) {
@@ -59,6 +85,7 @@ watch(
   () => props.messages,
   (newMsgs, oldMsgs) => {
     if (!newMsgs || newMsgs.length === 0) return
+    if (messagesStore.highlightMessageId !== null) return
 
     // If channel changed or we sent a message (first message ID is same)
     if (
@@ -91,7 +118,7 @@ function onDelete(messageId: number) {
 </script>
 
 <template>
-  <div class="message-list-container">
+  <div class="message-list-container" role="log" aria-label="Повідомлення" :aria-busy="loading">
     <div v-if="loading && messages.length === 0" class="loading-state">
       <span class="spinner"></span>
       Завантаження повідомлень...
@@ -117,6 +144,7 @@ function onDelete(messageId: number) {
           :key="msg.id"
           :message="msg"
           :is-consecutive="checkConsecutive(msg, index)"
+          :highlighted="msg.id === messagesStore.highlightMessageId"
           @edit="onEdit"
           @delete="onDelete"
         />

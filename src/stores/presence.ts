@@ -79,5 +79,28 @@ export const usePresenceStore = defineStore('presence', {
         delete typingTimeouts[key]
       }
     },
+
+    clearChannelTyping(channelId: number) {
+      const channelTyping = this.typingUsers[channelId]
+      if (channelTyping) {
+        Object.keys(channelTyping).forEach((userId) => {
+          const key = `${channelId}-${userId}`
+          if (typingTimeouts[key]) {
+            clearTimeout(typingTimeouts[key])
+            delete typingTimeouts[key]
+          }
+        })
+        delete this.typingUsers[channelId]
+      }
+    },
+
+    reset() {
+      Object.keys(typingTimeouts).forEach((key) => {
+        clearTimeout(typingTimeouts[key])
+        delete typingTimeouts[key]
+      })
+      this.typingUsers = {}
+      this.onlineUsers = {}
+    },
   },
 })

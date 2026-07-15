@@ -4,19 +4,33 @@ import { useChannelsStore } from '../stores/channels'
 import { useMessagesStore } from '../stores/messages'
 import { usePresenceStore } from '../stores/presence'
 import { useNotificationsStore } from '../stores/notifications'
+import { useUiStore } from '../stores/ui'
+import { useToastsStore } from '../stores/toasts'
 import { useEcho } from '../composables/useEcho'
 import { useTyping } from '../composables/useTyping'
+import { useKeyboardShortcuts } from '../composables/useKeyboardShortcuts'
 import ChannelSidebar from '../components/ChannelSidebar.vue'
 import MessageList from '../components/MessageList.vue'
 import MessageInput from '../components/MessageInput.vue'
 import MemberList from '../components/MemberList.vue'
 import ThreadPanel from '../components/ThreadPanel.vue'
-import { PhHash, PhLock, PhUsers, PhArrowClockwise } from '@phosphor-icons/vue'
+import SearchModal from '../components/SearchModal.vue'
+import ChannelNotificationsMenu from '../components/ChannelNotificationsMenu.vue'
+import {
+  PhHash,
+  PhLock,
+  PhUsers,
+  PhArrowClockwise,
+  PhMagnifyingGlass,
+  PhList,
+} from '@phosphor-icons/vue'
 
 const channelsStore = useChannelsStore()
 const messagesStore = useMessagesStore()
 const presenceStore = usePresenceStore()
 const notificationsStore = useNotificationsStore()
+const uiStore = useUiStore()
+const toastsStore = useToastsStore()
 
 // Initialize Laravel Echo / Reverb integration
 useEcho()
@@ -25,6 +39,28 @@ const { sendTypingWhisper } = useTyping()
 
 const loadingOlder = ref(false)
 const showMembers = ref(false)
+const showSearch = ref(false)
+
+useKeyboardShortcuts({
+  openSearch: () => (showSearch.value = true),
+  nextChannel: () => channelsStore.selectNextChannel(),
+  prevChannel: () => channelsStore.selectPrevChannel(),
+  closeOverlays: () => {
+    showSearch.value = false
+    showMembers.value = false
+    uiStore.sidebarOpen = false
+    if (messagesStore.activeThreadMessage) messagesStore.closeThread()
+  },
+})
+
+// Close the mobile sidebar drawer whenever the active channel changes,
+// regardless of whether it was selected by mouse, keyboard shortcut, or a jump-to-message.
+watch(
+  () => channelsStore.currentChannelId,
+  () => {
+    uiStore.sidebarOpen = false
+  },
+)
 
 onMounted(async () => {
   try {
@@ -61,6 +97,10 @@ async function handleSendMessage(text: string, files: File[] = []) {
       await messagesStore.sendNewMessage(channelsStore.currentChannelId, text, null, files)
     } catch (err) {
       console.error('Failed to send message:', err)
+      toastsStore.push(
+        'error',
+        'Повідомлення не надіслано. Перевірте зʼєднання і спробуйте надіслати ще раз.',
+      )
     }
   }
 }
@@ -72,6 +112,7 @@ async function handleLoadOlder() {
       await messagesStore.loadMessages(channelsStore.currentChannelId, { loadMore: true })
     } catch (err) {
       console.error('Failed to load older messages:', err)
+      toastsStore.push('error', 'Не вдалося завантажити старіші повідомлення.')
     } finally {
       loadingOlder.value = false
     }
@@ -131,13 +172,27 @@ const typingText = computed(() => {
 <template>
   <div class="workspace-layout">
     <!-- Sidebar Panel (260px) -->
-    <ChannelSidebar class="layout-sidebar" />
+    <ChannelSidebar :class="['layout-sidebar', { 'sidebar-open': uiStore.sidebarOpen }]" />
+
+    <!-- Backdrop for slide-in sidebar on narrow screens -->
+    <div
+      v-if="uiStore.sidebarOpen"
+      class="sidebar-backdrop"
+      @click="uiStore.sidebarOpen = false"
+    ></div>
 
     <!-- Active Channel Panel -->
     <main class="channel-area">
       <!-- Channel Header (56px) -->
       <header v-if="channelsStore.activeChannel" class="channel-header">
         <div class="header-left">
+          <button
+            class="sidebar-toggle"
+            aria-label="Показати канали"
+            @click="uiStore.sidebarOpen = true"
+          >
+            <PhList :size="20" />
+          </button>
           <component
             :is="channelsStore.activeChannel.type === 'private' ? PhLock : PhHash"
             :size="20"
@@ -152,6 +207,16 @@ const typingText = computed(() => {
         </div>
 
         <div class="header-right">
+          <ChannelNotificationsMenu />
+
+          <button
+            class="refetch-btn"
+            aria-label="Пошук повідомлень (Ctrl+K)"
+            @click="showSearch = true"
+          >
+            <PhMagnifyingGlass :size="18" />
+          </button>
+
           <button
             :class="['members-badge', { active: showMembers }]"
             aria-label="Показати учасників"
@@ -207,6 +272,9 @@ const typingText = computed(() => {
 
     <!-- Thread Panel -->
     <ThreadPanel v-if="messagesStore.activeThreadMessage" />
+
+    <!-- Search Modal -->
+    <SearchModal :open="showSearch" @close="showSearch = false" />
   </div>
 </template>
 
@@ -360,6 +428,52 @@ const typingText = computed(() => {
   }
   50% {
     opacity: 1;
+  }
+}
+
+.sidebar-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .sidebar-toggle {
+    display: flex;
+  }
+
+  .layout-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 700;
+    transform: translateX(-100%);
+    transition: transform var(--dur-base) var(--ease);
+  }
+
+  .layout-sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(20, 24, 31, 0.4);
+    z-index: 600;
+  }
+
+  .channel-area {
+    min-width: 0;
   }
 }
 </style>

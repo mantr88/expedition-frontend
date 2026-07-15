@@ -73,3 +73,43 @@ describe('Presence Store', () => {
     expect(store.getTypingUsersInChannel(channelId)).toEqual([])
   })
 })
+
+describe('presence store: cleanup', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.useFakeTimers()
+  })
+
+  it('clearChannelTyping чистить typing-стан каналу і його таймери', () => {
+    const store = usePresenceStore()
+    store.setUserTyping(1, 10, 'Anna')
+    store.setUserTyping(1, 11, 'Ihor')
+    store.setUserTyping(2, 10, 'Anna')
+
+    store.clearChannelTyping(1)
+
+    expect(store.getTypingUsersInChannel(1)).toHaveLength(0)
+    expect(store.getTypingUsersInChannel(2)).toHaveLength(1)
+    // Таймери каналу 1 зняті — advance не має падати чи щось міняти
+    vi.advanceTimersByTime(5000)
+    expect(store.getTypingUsersInChannel(2)).toHaveLength(0)
+  })
+
+  it('reset чистить усе', () => {
+    const store = usePresenceStore()
+    store.addUserOnline({
+      id: 1,
+      name: 'A',
+      email: 'a@a.a',
+      avatar_url: null,
+      status: 'active',
+      last_seen_at: null,
+    })
+    store.setUserTyping(1, 10, 'Anna')
+
+    store.reset()
+
+    expect(store.onlineUsers).toEqual({})
+    expect(store.getTypingUsersInChannel(1)).toHaveLength(0)
+  })
+})

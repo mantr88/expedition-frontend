@@ -242,4 +242,16 @@ function getPresenceLabel(userId: number, baseStatus: string) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+@media (max-width: 900px) {
+  .member-list-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 650;
+    width: min(360px, 100vw);
+    box-shadow: var(--shadow-modal);
+  }
+}
 </style>

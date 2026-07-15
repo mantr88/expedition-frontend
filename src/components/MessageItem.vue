@@ -12,6 +12,7 @@ import EmojiPicker from './EmojiPicker.vue'
 const props = defineProps<{
   message: Message
   isConsecutive: boolean
+  highlighted?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -133,6 +134,7 @@ function openThread() {
         'is-deleted': !!message.deleted_at,
         'is-mentioned': isMentioned,
         'picker-open': showEmojiPicker,
+        'msg-highlighted': highlighted,
       },
     ]"
   >
@@ -189,7 +191,9 @@ function openThread() {
         <!-- Thread replies indicator -->
         <div v-if="message.reply_count > 0" class="thread-replies-indicator" @click="openThread">
           <span class="reply-count">{{ message.reply_count }} відповідей</span>
-          <span v-if="message.last_reply_at" class="last-reply mono">· остання {{ formatTime(message.last_reply_at) }}</span>
+          <span v-if="message.last_reply_at" class="last-reply mono"
+            >· остання {{ formatTime(message.last_reply_at) }}</span
+          >
         </div>
 
         <!-- Metadata signs (edited, sending, failed) -->
@@ -257,6 +261,11 @@ function openThread() {
   bottom: 0;
   width: 2px;
   background-color: var(--rail-active);
+}
+
+.msg-highlighted {
+  background-color: var(--mention-bg);
+  transition: background-color var(--dur-base) var(--ease);
 }
 
 .message-header-row {

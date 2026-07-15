@@ -5,9 +5,10 @@ import {
   fetchChannelMembers,
   openDirectMessage as apiOpenDirectMessage,
   markChannelAsRead as apiMarkChannelAsRead,
+  updateNotificationsLevel as apiUpdateNotificationsLevel,
   type CreateChannelPayload,
 } from '../api/channels'
-import type { Channel, ChannelMember } from '../types/Channel'
+import type { Channel, ChannelMember, NotificationsLevel } from '../types/Channel'
 
 interface ChannelsState {
   channels: Channel[]
@@ -136,6 +137,36 @@ export const useChannelsStore = defineStore('channels', {
       if (channel) {
         channel.unread_count = (channel.unread_count || 0) + 1
       }
+    },
+
+    async setNotificationsLevel(channelId: number, level: NotificationsLevel) {
+      const channel = this.channels.find((c) => c.id === channelId)
+      if (!channel || !channel.my_membership) return
+
+      const previous = channel.my_membership.notifications_level
+      channel.my_membership.notifications_level = level
+
+      try {
+        await apiUpdateNotificationsLevel(channelId, level)
+      } catch (err) {
+        channel.my_membership.notifications_level = previous
+        throw err
+      }
+    },
+
+    selectNextChannel() {
+      this.selectSibling(1)
+    },
+
+    selectPrevChannel() {
+      this.selectSibling(-1)
+    },
+
+    selectSibling(offset: number) {
+      if (this.channels.length === 0) return
+      const idx = this.channels.findIndex((c) => c.id === this.currentChannelId)
+      const next = (idx + offset + this.channels.length) % this.channels.length
+      this.selectChannel(this.channels[next].id)
     },
   },
 })

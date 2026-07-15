@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Channel, ChannelMember } from '../types/Channel'
+import type { Channel, ChannelMember, NotificationsLevel } from '../types/Channel'
 
 export interface CreateChannelPayload {
   name: string
@@ -69,4 +69,13 @@ export async function inviteMember(channelId: number, userId: number): Promise<C
 
 export async function removeMember(channelId: number, userId: number): Promise<void> {
   await apiClient.delete(`/api/channels/${channelId}/members/${userId}`)
+}
+
+export async function updateNotificationsLevel(
+  channelId: number,
+  level: NotificationsLevel,
+): Promise<void> {
+  await apiClient.put(`/api/channels/${channelId}/notifications`, {
+    notifications_level: level,
+  })
 }

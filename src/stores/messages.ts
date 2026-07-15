@@ -26,6 +26,7 @@ interface MessagesState {
   threadReplies: Message[]
   threadPagination: { hasMore: boolean; nextCursor: number | null }
   threadLoading: boolean
+  highlightMessageId: number | null
 }
 
 export const useMessagesStore = defineStore('messages', {
@@ -37,6 +38,7 @@ export const useMessagesStore = defineStore('messages', {
     threadReplies: [],
     threadPagination: { hasMore: false, nextCursor: null },
     threadLoading: false,
+    highlightMessageId: null,
   }),
 
   actions: {
@@ -114,7 +116,12 @@ export const useMessagesStore = defineStore('messages', {
       }
     },
 
-    async sendNewMessage(channelId: number, body: string, parentId: number | null = null, files: File[] = []) {
+    async sendNewMessage(
+      channelId: number,
+      body: string,
+      parentId: number | null = null,
+      files: File[] = [],
+    ) {
       const authStore = useAuthStore()
       if (!authStore.user) throw new Error('Not authenticated')
 
@@ -269,10 +276,10 @@ export const useMessagesStore = defineStore('messages', {
     async editMessage(channelId: number, messageId: number, body: string) {
       const msg = this.findMessageAnywhere(channelId, messageId)
       if (!msg) return
-      
+
       const oldBodyRaw = msg.body_raw
       const oldBodyHtml = msg.body_html
-      
+
       msg.body_raw = body
       msg.body_html = body
       msg.edited_at = new Date().toISOString()
@@ -298,7 +305,7 @@ export const useMessagesStore = defineStore('messages', {
     async deleteMessage(channelId: number, messageId: number) {
       const msg = this.findMessageAnywhere(channelId, messageId)
       if (!msg) return
-      
+
       const oldDeletedAt = msg.deleted_at
       msg.deleted_at = new Date().toISOString()
 
@@ -320,7 +327,9 @@ export const useMessagesStore = defineStore('messages', {
         if (this.activeThreadMessage && this.activeThreadMessage.id === message.parent_id) {
           const exists = this.threadReplies.some((m) => m.id === message.id)
           if (!exists) {
-            const optIdx = this.threadReplies.findIndex((m) => m.client_message_id === message.client_message_id)
+            const optIdx = this.threadReplies.findIndex(
+              (m) => m.client_message_id === message.client_message_id,
+            )
             if (optIdx !== -1) {
               this.threadReplies[optIdx] = message
             } else {
@@ -330,9 +339,9 @@ export const useMessagesStore = defineStore('messages', {
           }
         }
         // Update parent message reply_count and last_reply_at
-        const parentMsg = this.messages[channelId]?.find(m => m.id === message.parent_id)
+        const parentMsg = this.messages[channelId]?.find((m) => m.id === message.parent_id)
         if (parentMsg) {
-          parentMsg.reply_count = message.reply_count || (parentMsg.reply_count + 1)
+          parentMsg.reply_count = message.reply_count || parentMsg.reply_count + 1
           parentMsg.last_reply_at = message.created_at
         }
         return
@@ -375,14 +384,17 @@ export const useMessagesStore = defineStore('messages', {
         msg.deleted_at = new Date().toISOString()
       }
     },
-    
-    handleReactionToggled(channelId: number, payload: { message_id: number; emoji: string; count: number; user_id: number }) {
+
+    handleReactionToggled(
+      channelId: number,
+      payload: { message_id: number; emoji: string; count: number; user_id: number },
+    ) {
       const authStore = useAuthStore()
       if (authStore.user?.id === payload.user_id) return // We already handled this via optimistic update
-      
+
       const msg = this.findMessageAnywhere(channelId, payload.message_id)
       if (!msg) return
-      
+
       const idx = msg.reactions.findIndex((r) => r.emoji === payload.emoji)
       if (payload.count > 0) {
         if (idx !== -1) {
@@ -419,15 +431,62 @@ export const useMessagesStore = defineStore('messages', {
             (a, b) => a.id - b.id,
           )
         }
-        
+
         if (this.activeThreadMessage) {
-           await this.loadReplies(this.activeThreadMessage.id)
+          await this.loadReplies(this.activeThreadMessage.id)
         }
       } catch (err) {
         console.error('Failed to sync messages on reconnect:', err)
       } finally {
         this.loading[channelId] = false
       }
+    },
+
+    async jumpToMessage(channelId: number, messageId: number) {
+      this.highlightMessageId = messageId
+
+      try {
+        const channelsStore = useChannelsStore()
+        if (channelsStore.currentChannelId !== channelId) {
+          await channelsStore.selectChannel(channelId)
+        }
+
+        // WorkspaceView watcher може вже вантажити цей канал — дочекатись
+        await this.waitForIdle(channelId)
+
+        if (!this.messages[channelId] || this.messages[channelId].length === 0) {
+          await this.loadMessages(channelId)
+        }
+
+        let attempts = 0
+        const MAX_PAGES = 20
+        while (
+          !this.messages[channelId]?.some((m) => m.id === messageId) &&
+          this.pagination[channelId]?.hasMore &&
+          attempts < MAX_PAGES
+        ) {
+          await this.loadMessages(channelId, { loadMore: true })
+          await this.waitForIdle(channelId)
+          attempts++
+        }
+
+        if (!this.messages[channelId]?.some((m) => m.id === messageId)) {
+          this.highlightMessageId = null
+        }
+      } catch (err) {
+        this.highlightMessageId = null
+        throw err
+      }
+    },
+
+    async waitForIdle(channelId: number) {
+      while (this.loading[channelId]) {
+        await new Promise((resolve) => setTimeout(resolve, 30))
+      }
+    },
+
+    clearHighlight() {
+      this.highlightMessageId = null
     },
   },
 })
