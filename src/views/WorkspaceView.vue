@@ -48,9 +48,19 @@ useKeyboardShortcuts({
   closeOverlays: () => {
     showSearch.value = false
     showMembers.value = false
+    uiStore.sidebarOpen = false
     if (messagesStore.activeThreadMessage) messagesStore.closeThread()
   },
 })
+
+// Close the mobile sidebar drawer whenever the active channel changes,
+// regardless of whether it was selected by mouse, keyboard shortcut, or a jump-to-message.
+watch(
+  () => channelsStore.currentChannelId,
+  () => {
+    uiStore.sidebarOpen = false
+  },
+)
 
 onMounted(async () => {
   try {

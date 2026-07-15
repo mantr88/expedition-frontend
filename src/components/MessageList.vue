@@ -34,7 +34,7 @@ const lastReadMessageId = computed(() => {
 let highlightTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(
-  [() => messagesStore.highlightMessageId, () => props.messages.length],
+  [() => messagesStore.highlightMessageId, () => props.messages],
   ([id]) => {
     if (id === null) return
     const index = props.messages.findIndex((m) => m.id === id)
