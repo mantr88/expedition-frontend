@@ -25,6 +25,7 @@ interface MessageDeletedEvent {
 interface PusherConnector {
   connection?: {
     bind: (event: string, callback: (states: StateChangeDetails) => void) => void
+    unbind?: (event: string, callback: (states: StateChangeDetails) => void) => void
   }
 }
 
@@ -37,25 +38,25 @@ export function useEcho() {
   const echo = getEcho()
 
   // Bind reconnect listener once
-  if (!isConnectionListenerBound) {
+  const connection = (echo.connector as unknown as PusherConnector).connection
+  let stateChangeCallback: ((states: StateChangeDetails) => void) | null = null
+
+  if (!isConnectionListenerBound && connection) {
     isConnectionListenerBound = true
     let wasDisconnected = false
-
-    const connection = (echo.connector as unknown as PusherConnector).connection
-    if (connection) {
-      connection.bind('state_change', (states: StateChangeDetails) => {
-        if (states.current === 'connected') {
-          if (wasDisconnected) {
-            wasDisconnected = false
-            if (channelsStore.currentChannelId !== null) {
-              messagesStore.reconnectAndSync(channelsStore.currentChannelId)
-            }
+    stateChangeCallback = (states: StateChangeDetails) => {
+      if (states.current === 'connected') {
+        if (wasDisconnected) {
+          wasDisconnected = false
+          if (channelsStore.currentChannelId !== null) {
+            messagesStore.reconnectAndSync(channelsStore.currentChannelId)
           }
-        } else if (states.current === 'disconnected' || states.current === 'unavailable') {
-          wasDisconnected = true
         }
-      })
+      } else if (states.current === 'disconnected' || states.current === 'unavailable') {
+        wasDisconnected = true
+      }
     }
+    connection.bind('state_change', stateChangeCallback)
   }
 
   // Watch user to subscribe to personal notifications
@@ -140,6 +141,9 @@ export function useEcho() {
     (newChanId, oldChanId) => {
       if (oldChanId !== null) {
         echo.leaveChannel(`presence-channel.${oldChanId}`)
+        if (typeof oldChanId === 'number') {
+          presenceStore.clearChannelTyping(oldChanId)
+        }
       }
 
       if (newChanId !== null) {
@@ -176,5 +180,11 @@ export function useEcho() {
     if (channelsStore.currentChannelId !== null) {
       echo.leaveChannel(`presence-channel.${channelsStore.currentChannelId}`)
     }
+
+    if (stateChangeCallback && connection?.unbind) {
+      connection.unbind('state_change', stateChangeCallback)
+      isConnectionListenerBound = false
+    }
+    presenceStore.reset()
   })
 }
