@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useChannelsStore } from '../stores/channels'
 import { useToastsStore } from '../stores/toasts'
 import type { NotificationsLevel } from '../types/Channel'
@@ -8,6 +8,7 @@ import { PhBell, PhBellSlash, PhAt, PhCheck } from '@phosphor-icons/vue'
 const channelsStore = useChannelsStore()
 const toastsStore = useToastsStore()
 const open = ref(false)
+const menuRef = ref<HTMLElement | null>(null)
 
 const options: { value: NotificationsLevel; label: string }[] = [
   { value: 'all', label: 'Усі повідомлення' },
@@ -25,10 +26,39 @@ async function select(level: NotificationsLevel) {
     toastsStore.push('error', 'Не вдалося зберегти налаштування сповіщень. Спробуйте ще раз.')
   }
 }
+
+function clickOutsideHandler(event: MouseEvent) {
+  if (menuRef.value && !menuRef.value.contains(event.target as Node)) {
+    open.value = false
+  }
+}
+
+function keydownHandler(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    open.value = false
+  }
+}
+
+watch(open, (isOpen) => {
+  if (isOpen) {
+    setTimeout(() => {
+      document.addEventListener('click', clickOutsideHandler)
+      document.addEventListener('keydown', keydownHandler)
+    }, 0)
+  } else {
+    document.removeEventListener('click', clickOutsideHandler)
+    document.removeEventListener('keydown', keydownHandler)
+  }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', clickOutsideHandler)
+  document.removeEventListener('keydown', keydownHandler)
+})
 </script>
 
 <template>
-  <div class="notif-menu">
+  <div ref="menuRef" class="notif-menu">
     <button
       class="notif-btn"
       :aria-label="`Сповіщення: ${options.find((o) => o.value === channelsStore.activeChannel?.my_membership?.notifications_level)?.label ?? 'Усі повідомлення'}`"
