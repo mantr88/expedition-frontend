@@ -5,6 +5,7 @@ import App from './App.vue'
 import router from './router'
 import { setUnauthorizedHandler } from './api/client'
 import { useAuthStore } from './stores/auth'
+import { useUiStore } from './stores/ui'
 
 async function enableMocking() {
   // Defaults to mocks on: the backend isn't always available (contract-first workflow).
@@ -22,6 +23,8 @@ async function bootstrap() {
   const app = createApp(App)
   app.use(createPinia())
   app.use(router)
+
+  useUiStore().initTheme()
 
   setUnauthorizedHandler(() => {
     const authStore = useAuthStore()

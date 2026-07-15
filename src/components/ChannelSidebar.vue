@@ -3,12 +3,14 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChannelsStore } from '../stores/channels'
 import { useAuthStore } from '../stores/auth'
+import { useUiStore } from '../stores/ui'
 import { searchUsers } from '../api/users'
 import type { User } from '../types/User'
-import { PhHash, PhLock, PhPlus, PhSignOut, PhChat } from '@phosphor-icons/vue'
+import { PhHash, PhLock, PhPlus, PhSignOut, PhChat, PhMoon, PhSun } from '@phosphor-icons/vue'
 
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 const router = useRouter()
 
 const showModal = ref(false)
@@ -38,6 +40,11 @@ async function handleCreateChannel() {
     const error = err as { response?: { data?: { message?: string } } }
     errorMsg.value = error.response?.data?.message || 'Не вдалося створити канал'
   }
+}
+
+function handleSelectChannel(channelId: number) {
+  channelsStore.selectChannel(channelId)
+  uiStore.sidebarOpen = false
 }
 
 async function handleLogout() {
@@ -72,6 +79,7 @@ async function startDirectMessage(userId: number) {
     showDmModal.value = false
     dmSearchQuery.value = ''
     dmSearchResults.value = []
+    uiStore.sidebarOpen = false
   } catch (err) {
     console.error('Failed to start DM', err)
   }
@@ -82,6 +90,13 @@ async function startDirectMessage(userId: number) {
   <aside class="sidebar">
     <div class="sidebar-header">
       <span class="workspace-title">Expedition Workspace</span>
+      <button
+        class="theme-btn"
+        :aria-label="uiStore.theme === 'dark' ? 'Світла тема' : 'Темна тема'"
+        @click="uiStore.toggleTheme()"
+      >
+        <component :is="uiStore.theme === 'dark' ? PhSun : PhMoon" :size="16" />
+      </button>
     </div>
 
     <div class="sidebar-section">
@@ -103,7 +118,7 @@ async function startDirectMessage(userId: number) {
               unread: channel.unread_count && channel.unread_count > 0,
             },
           ]"
-          @click="channelsStore.selectChannel(channel.id)"
+          @click="handleSelectChannel(channel.id)"
         >
           <component
             :is="channel.type === 'private' ? PhLock : PhHash"
@@ -137,7 +152,7 @@ async function startDirectMessage(userId: number) {
               unread: channel.unread_count && channel.unread_count > 0,
             },
           ]"
-          @click="channelsStore.selectChannel(channel.id)"
+          @click="handleSelectChannel(channel.id)"
         >
           <PhChat :size="16" class="channel-icon" />
           <span class="channel-name">{{ channel.name }}</span>
@@ -266,8 +281,26 @@ async function startDirectMessage(userId: number) {
   height: 56px;
   padding: 0 var(--space-4);
   display: flex;
+  justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.theme-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.theme-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .workspace-title {

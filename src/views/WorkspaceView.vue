@@ -4,6 +4,7 @@ import { useChannelsStore } from '../stores/channels'
 import { useMessagesStore } from '../stores/messages'
 import { usePresenceStore } from '../stores/presence'
 import { useNotificationsStore } from '../stores/notifications'
+import { useUiStore } from '../stores/ui'
 import { useEcho } from '../composables/useEcho'
 import { useTyping } from '../composables/useTyping'
 import ChannelSidebar from '../components/ChannelSidebar.vue'
@@ -13,12 +14,20 @@ import MemberList from '../components/MemberList.vue'
 import ThreadPanel from '../components/ThreadPanel.vue'
 import SearchModal from '../components/SearchModal.vue'
 import ChannelNotificationsMenu from '../components/ChannelNotificationsMenu.vue'
-import { PhHash, PhLock, PhUsers, PhArrowClockwise, PhMagnifyingGlass } from '@phosphor-icons/vue'
+import {
+  PhHash,
+  PhLock,
+  PhUsers,
+  PhArrowClockwise,
+  PhMagnifyingGlass,
+  PhList,
+} from '@phosphor-icons/vue'
 
 const channelsStore = useChannelsStore()
 const messagesStore = useMessagesStore()
 const presenceStore = usePresenceStore()
 const notificationsStore = useNotificationsStore()
+const uiStore = useUiStore()
 
 // Initialize Laravel Echo / Reverb integration
 useEcho()
@@ -134,13 +143,27 @@ const typingText = computed(() => {
 <template>
   <div class="workspace-layout">
     <!-- Sidebar Panel (260px) -->
-    <ChannelSidebar class="layout-sidebar" />
+    <ChannelSidebar :class="['layout-sidebar', { 'sidebar-open': uiStore.sidebarOpen }]" />
+
+    <!-- Backdrop for slide-in sidebar on narrow screens -->
+    <div
+      v-if="uiStore.sidebarOpen"
+      class="sidebar-backdrop"
+      @click="uiStore.sidebarOpen = false"
+    ></div>
 
     <!-- Active Channel Panel -->
     <main class="channel-area">
       <!-- Channel Header (56px) -->
       <header v-if="channelsStore.activeChannel" class="channel-header">
         <div class="header-left">
+          <button
+            class="sidebar-toggle"
+            aria-label="Показати канали"
+            @click="uiStore.sidebarOpen = true"
+          >
+            <PhList :size="20" />
+          </button>
           <component
             :is="channelsStore.activeChannel.type === 'private' ? PhLock : PhHash"
             :size="20"
@@ -376,6 +399,52 @@ const typingText = computed(() => {
   }
   50% {
     opacity: 1;
+  }
+}
+
+.sidebar-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .sidebar-toggle {
+    display: flex;
+  }
+
+  .layout-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 700;
+    transform: translateX(-100%);
+    transition: transform var(--dur-base) var(--ease);
+  }
+
+  .layout-sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(20, 24, 31, 0.4);
+    z-index: 600;
+  }
+
+  .channel-area {
+    min-width: 0;
   }
 }
 </style>
