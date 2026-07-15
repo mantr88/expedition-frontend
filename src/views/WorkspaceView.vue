@@ -89,7 +89,7 @@ async function handleSendMessage(text: string, files: File[] = []) {
       console.error('Failed to send message:', err)
       toastsStore.push(
         'error',
-        'Повідомлення не надіслано. Натисніть «Повторити» біля повідомлення.',
+        'Повідомлення не надіслано. Перевірте зʼєднання і спробуйте надіслати ще раз.',
       )
     }
   }

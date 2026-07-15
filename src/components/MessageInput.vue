@@ -102,6 +102,7 @@ function handleKeyDown(e: KeyboardEvent) {
       return
     } else if (e.key === 'Escape') {
       isMentioning.value = false
+      e.stopPropagation()
       return
     }
   }

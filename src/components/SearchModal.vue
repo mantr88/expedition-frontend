@@ -77,7 +77,10 @@ async function openResult(result: SearchResult) {
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') emit('close')
+  if (e.key === 'Escape') {
+    e.stopPropagation()
+    emit('close')
+  }
 }
 
 onMounted(() => {
