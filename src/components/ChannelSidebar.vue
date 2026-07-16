@@ -132,8 +132,17 @@ async function startDirectMessage(userId: number) {
             class="channel-icon"
           />
           <span class="channel-name">{{ channel.name }}</span>
+
+          <button
+            v-if="!channel.my_membership"
+            class="join-btn"
+            @click.stop="channelsStore.joinChannel(channel.id)"
+          >
+            Приєднатися
+          </button>
+
           <span
-            v-if="channel.unread_count && channel.unread_count > 0"
+            v-else-if="channel.unread_count && channel.unread_count > 0"
             class="unread-badge"
             :aria-label="`${channel.unread_count} непрочитаних`"
           >
@@ -418,6 +427,25 @@ async function startDirectMessage(userId: number) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+}
+
+.join-btn {
+  background-color: var(--indigo-100);
+  color: var(--indigo-700);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  text-transform: uppercase;
+  margin-left: auto;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.join-btn:hover {
+  background-color: var(--indigo-200);
 }
 
 .sidebar-footer {

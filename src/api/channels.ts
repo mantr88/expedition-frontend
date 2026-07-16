@@ -71,6 +71,10 @@ export async function removeMember(channelId: number, userId: number): Promise<v
   await apiClient.delete(`/api/channels/${channelId}/members/${userId}`)
 }
 
+export async function joinChannel(channelId: number): Promise<void> {
+  await apiClient.post(`/api/channels/${channelId}/join`)
+}
+
 export async function updateNotificationsLevel(
   channelId: number,
   level: NotificationsLevel,

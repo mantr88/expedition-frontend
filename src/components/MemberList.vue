@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useChannelsStore } from '../stores/channels'
 import { usePresenceStore } from '../stores/presence'
-import { PhX } from '@phosphor-icons/vue'
+import { PhX, PhPlus } from '@phosphor-icons/vue'
+import AddMemberPopover from './AddMemberPopover.vue'
 
+const showAddMemberPopover = ref(false)
 const emit = defineEmits<{
   (e: 'close'): void
 }>()
@@ -49,9 +51,21 @@ function getPresenceLabel(userId: number, baseStatus: string) {
   <div class="member-list-panel">
     <header class="panel-header">
       <h3 class="panel-title">Учасники каналу ({{ channelsStore.activeChannelMembers.length }})</h3>
-      <button class="close-btn" aria-label="Закрити панель учасників" @click="emit('close')">
-        <PhX :size="20" />
-      </button>
+      <div class="header-actions">
+        <button
+          v-if="channelsStore.activeChannel?.type !== 'dm'"
+          class="add-member-btn"
+          title="Додати учасника"
+          aria-label="Додати учасника"
+          @click="showAddMemberPopover = true"
+        >
+          <PhPlus :size="16" />
+        </button>
+        <button class="close-btn" aria-label="Закрити панель учасників" @click="emit('close')">
+          <PhX :size="20" />
+        </button>
+      </div>
+      <AddMemberPopover v-if="showAddMemberPopover" @close="showAddMemberPopover = false" />
     </header>
 
     <div class="panel-content">
@@ -99,6 +113,33 @@ function getPresenceLabel(userId: number, baseStatus: string) {
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  position: relative;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.add-member-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.add-member-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .panel-title {

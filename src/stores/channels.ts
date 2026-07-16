@@ -2,10 +2,13 @@ import { defineStore } from 'pinia'
 import {
   fetchChannels,
   createChannel as apiCreateChannel,
+  fetchChannel as apiFetchChannel,
   fetchChannelMembers,
   openDirectMessage as apiOpenDirectMessage,
   markChannelAsRead as apiMarkChannelAsRead,
   updateNotificationsLevel as apiUpdateNotificationsLevel,
+  inviteMember as apiInviteMember,
+  joinChannel as apiJoinChannel,
   type CreateChannelPayload,
 } from '../api/channels'
 import type { Channel, ChannelMember, NotificationsLevel } from '../types/Channel'
@@ -82,6 +85,32 @@ export const useChannelsStore = defineStore('channels', {
         this.members[channelId] = membersList
       } catch (err) {
         console.error('Failed to load channel members:', err)
+      }
+    },
+
+    async inviteMember(channelId: number, userId: number) {
+      const membership = await apiInviteMember(channelId, userId)
+      const list = this.members[channelId] ?? (this.members[channelId] = [])
+      if (!list.some((m) => m.user.id === membership.user.id)) {
+        list.push(membership)
+        const channel = this.channels.find((c) => c.id === channelId)
+        if (channel) channel.members_count += 1
+      }
+    },
+
+    async joinChannel(channelId: number) {
+      this.loading = true
+      this.error = null
+      try {
+        await apiJoinChannel(channelId)
+        const updatedChan = await apiFetchChannel(channelId)
+        this.handleChannelUpdated(updatedChan)
+        await this.selectChannel(channelId)
+      } catch (err) {
+        this.error = 'Не вдалося приєднатися до каналу.'
+        throw err
+      } finally {
+        this.loading = false
       }
     },
 

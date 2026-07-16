@@ -6,7 +6,7 @@ import { usePresenceStore } from '../stores/presence'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationsStore } from '../stores/notifications'
 import type { Message } from '../types/Message'
-import type { Channel } from '../types/Channel'
+import type { Channel, ChannelMember } from '../types/Channel'
 import type { User } from '../types/User'
 import type { StateChangeDetails } from '../api/echo'
 
@@ -129,6 +129,38 @@ export function useEcho() {
               messagesStore.handleReactionToggled(channel.id, payload)
             },
           )
+          privateChan.listen('.MemberAdded', (payload: ChannelMember) => {
+            const list = channelsStore.members[channel.id] ?? (channelsStore.members[channel.id] = [])
+            if (!list.some((m) => m.user.id === payload.user.id)) {
+              list.push(payload)
+              const c = channelsStore.channels.find((ch) => ch.id === channel.id)
+              if (c) c.members_count += 1
+            }
+          })
+          privateChan.listen('.MemberRemoved', (payload: { channel_id: number; user_id: number }) => {
+            const list = channelsStore.members[channel.id]
+            if (list) {
+              const idx = list.findIndex((m) => m.user.id === payload.user_id)
+              if (idx !== -1) {
+                list.splice(idx, 1)
+                const c = channelsStore.channels.find((ch) => ch.id === channel.id)
+                if (c) c.members_count -= 1
+              }
+            }
+            if (authStore.user?.id === payload.user_id) {
+              const cIdx = channelsStore.channels.findIndex((ch) => ch.id === channel.id)
+              if (cIdx !== -1) {
+                channelsStore.channels.splice(cIdx, 1)
+                if (channelsStore.currentChannelId === channel.id) {
+                  if (channelsStore.channels.length > 0) {
+                    channelsStore.selectChannel(channelsStore.channels[0].id)
+                  } else {
+                    channelsStore.currentChannelId = null
+                  }
+                }
+              }
+            }
+          })
         }
       })
     },
