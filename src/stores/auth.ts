@@ -11,6 +11,7 @@ interface AuthState {
   user: User | null
   status: 'idle' | 'loading' | 'authenticated' | 'unauthenticated'
   error: string | null
+  errors: Record<string, string[]> | null
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -18,6 +19,7 @@ export const useAuthStore = defineStore('auth', {
     user: null,
     status: 'idle',
     error: null,
+    errors: null,
   }),
 
   getters: {
@@ -28,12 +30,20 @@ export const useAuthStore = defineStore('auth', {
     async login(payload: LoginPayload) {
       this.status = 'loading'
       this.error = null
+      this.errors = null
       try {
         await apiLogin(payload)
         await this.fetchUser()
-      } catch (err) {
+      } catch (err: any) {
         this.status = 'unauthenticated'
-        this.error = 'Не вдалося увійти. Перевірте email і пароль.'
+        if (err.response?.status === 422) {
+          this.errors = err.response.data?.errors || null
+          this.error = err.response.data?.message || 'Помилка валідації.'
+        } else if (err.response?.status === 429) {
+          this.error = 'Забагато спроб, спробуйте за хвилину.'
+        } else {
+          this.error = 'Не вдалося увійти. Перевірте email і пароль.'
+        }
         throw err
       }
     },
@@ -61,6 +71,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = null
       this.status = 'unauthenticated'
       this.error = null
+      this.errors = null
     },
   },
 })

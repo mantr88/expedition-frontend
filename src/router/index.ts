@@ -23,7 +23,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return { name: 'login' }
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
 
   if (to.name === 'login' && authStore.isAuthenticated) {
