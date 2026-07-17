@@ -81,9 +81,9 @@ describe('LoginView', () => {
         status: 422,
         data: {
           message: 'The given data was invalid.',
-          errors: { email: ['Цей email вже зайнятий.'] }
-        }
-      }
+          errors: { email: ['Цей email вже зайнятий.'] },
+        },
+      },
     }
     vi.mocked(authApi.login).mockRejectedValue(error422)
 
@@ -109,8 +109,8 @@ describe('LoginView', () => {
     const error429 = {
       response: {
         status: 429,
-        data: { message: 'Too many requests' }
-      }
+        data: { message: 'Too many requests' },
+      },
     }
     vi.mocked(authApi.login).mockRejectedValue(error429)
 

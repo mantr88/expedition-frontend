@@ -34,12 +34,18 @@ export const useAuthStore = defineStore('auth', {
       try {
         await apiLogin(payload)
         await this.fetchUser()
-      } catch (err: any) {
+      } catch (err: unknown) {
         this.status = 'unauthenticated'
-        if (err.response?.status === 422) {
-          this.errors = err.response.data?.errors || null
-          this.error = err.response.data?.message || 'Помилка валідації.'
-        } else if (err.response?.status === 429) {
+        const error = err as {
+          response?: {
+            status?: number
+            data?: { errors?: Record<string, string[]>; message?: string }
+          }
+        }
+        if (error.response?.status === 422) {
+          this.errors = error.response.data?.errors || null
+          this.error = error.response.data?.message || 'Помилка валідації.'
+        } else if (error.response?.status === 429) {
           this.error = 'Забагато спроб, спробуйте за хвилину.'
         } else {
           this.error = 'Не вдалося увійти. Перевірте email і пароль.'

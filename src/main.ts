@@ -29,7 +29,7 @@ async function bootstrap() {
   setUnauthorizedHandler(() => {
     const authStore = useAuthStore()
     authStore.reset()
-    if (router.currentRoute.value.name !== 'login') {
+    if (router.currentRoute.value.meta.requiresAuth) {
       router.push({ name: 'login' })
     }
   })

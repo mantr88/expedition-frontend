@@ -429,4 +429,68 @@ export const handlers = [
 
     return HttpResponse.json({ data, meta: { total: data.length } })
   }),
+
+  // Invitations endpoints
+  http.post('*/api/invitations', async ({ request }) => {
+    if (!isAuthenticated) {
+      return HttpResponse.json({ message: 'Unauthenticated' }, { status: 401 })
+    }
+    const body = (await request.json()) as { email?: string; channel_id?: number }
+    if (!body.email) {
+      return HttpResponse.json({ message: 'Validation failed' }, { status: 422 })
+    }
+
+    const newUser: User = {
+      id: mockUsers.length + 1,
+      name: body.email.split('@')[0],
+      email: body.email,
+      avatar_url: null,
+      status: 'offline',
+      last_seen_at: null,
+      is_pending: true,
+    }
+    mockUsers.push(newUser)
+
+    if (body.channel_id) {
+      const channel = channels.find((c) => c.id === body.channel_id)
+      if (channel) {
+        channel.members_count++
+      }
+    }
+
+    return HttpResponse.json(newUser, { status: 201 })
+  }),
+
+  http.post('*/set-password', async ({ request }) => {
+    const body = (await request.json()) as {
+      email?: string
+      token?: string
+      name?: string
+      password?: string
+      password_confirmation?: string
+    }
+
+    if (
+      !body.email ||
+      !body.token ||
+      !body.name ||
+      !body.password ||
+      body.password !== body.password_confirmation
+    ) {
+      return HttpResponse.json({ message: 'Validation failed' }, { status: 422 })
+    }
+
+    if (body.token === 'invalid-token') {
+      return HttpResponse.json({ message: 'Invalid or expired token' }, { status: 422 })
+    }
+
+    const user = mockUsers.find((u) => u.email === body.email)
+    if (user) {
+      user.name = body.name
+      user.is_pending = false
+      user.status = 'active'
+    }
+
+    return new HttpResponse(null, { status: 204 })
+  }),
 ]

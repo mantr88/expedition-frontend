@@ -22,7 +22,7 @@ async function handleSubmit() {
   submitting.value = true
   try {
     await authStore.login({ email: email.value, password: password.value })
-    
+
     const redirect = route.query.redirect as string
     if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
       await router.push(redirect)
@@ -43,7 +43,7 @@ async function handleSubmit() {
       <div class="brand-header">
         <span class="wordmark">Expedition<span class="accent">.</span></span>
       </div>
-      
+
       <div class="titles">
         <h1>Вхід</h1>
         <p class="subtitle">Увійдіть, щоб продовжити роботу</p>
@@ -55,13 +55,13 @@ async function handleSubmit() {
 
       <label class="field">
         <span class="label-text">Email</span>
-        <input 
+        <input
           ref="emailInput"
-          v-model="email" 
-          type="email" 
-          name="email" 
-          autocomplete="username" 
-          required 
+          v-model="email"
+          type="email"
+          name="email"
+          autocomplete="username"
+          required
           :aria-invalid="!!authStore.errors?.email"
         />
         <span v-if="authStore.errors?.email" class="field-error" role="alert">
@@ -80,9 +80,9 @@ async function handleSubmit() {
             required
             :aria-invalid="!!authStore.errors?.password"
           />
-          <button 
-            type="button" 
-            class="toggle-password" 
+          <button
+            type="button"
+            class="toggle-password"
             @click="showPassword = !showPassword"
             :aria-label="showPassword ? 'Сховати пароль' : 'Показати пароль'"
           >
@@ -93,7 +93,7 @@ async function handleSubmit() {
           {{ authStore.errors.password[0] }}
         </span>
       </label>
-      
+
       <button type="submit" class="submit-btn" :disabled="submitting">
         <span v-if="submitting" class="spinner"></span>
         <span v-else>Увійти</span>
@@ -126,8 +126,14 @@ async function handleSubmit() {
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -209,7 +215,7 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
-input[aria-invalid="true"] {
+input[aria-invalid='true'] {
   border-color: var(--danger);
 }
 
@@ -276,7 +282,9 @@ input[aria-invalid="true"] {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .footer {

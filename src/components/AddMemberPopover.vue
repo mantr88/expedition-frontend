@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue'
+import { ref, watch, onMounted, nextTick, computed } from 'vue'
 import { searchUsers } from '../api/users'
+import { inviteByEmail } from '../api/invitations'
 import type { User } from '../types/User'
 import { useChannelsStore } from '../stores/channels'
-import { PhX, PhCheck } from '@phosphor-icons/vue'
+import { PhX, PhCheck, PhPaperPlaneTilt } from '@phosphor-icons/vue'
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -17,28 +18,35 @@ const loading = ref(false)
 const errorMsg = ref('')
 const addedUserIds = ref<Set<number>>(new Set())
 const searchInput = ref<HTMLInputElement | null>(null)
+const invitedEmail = ref('')
+
+const isValidEmail = computed(() => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(query.value)
+})
 
 let debounceTimeout: ReturnType<typeof setTimeout> | null = null
 
 watch(query, (newVal) => {
+  invitedEmail.value = ''
   if (debounceTimeout) clearTimeout(debounceTimeout)
   if (!newVal.trim()) {
     results.value = []
     loading.value = false
     return
   }
-  
+
   loading.value = true
   errorMsg.value = ''
-  
+
   debounceTimeout = setTimeout(async () => {
     try {
       const allUsers = await searchUsers(newVal)
       // Filter out existing members
-      const existingMembers = new Set(channelsStore.activeChannelMembers.map(m => m.user.id))
-      results.value = allUsers.filter(u => !existingMembers.has(u.id))
+      const existingMembers = new Set(channelsStore.activeChannelMembers.map((m) => m.user.id))
+      results.value = allUsers.filter((u) => !existingMembers.has(u.id))
     } catch (err: unknown) {
-      const error = err as { response?: { status?: number, data?: { message?: string } } }
+      const error = err as { response?: { status?: number; data?: { message?: string } } }
       if (error.response?.status === 403) {
         errorMsg.value = 'Недостатньо прав'
       } else {
@@ -52,18 +60,41 @@ watch(query, (newVal) => {
 
 async function invite(user: User) {
   if (!channelsStore.currentChannelId || addedUserIds.value.has(user.id)) return
-  
+
   try {
     errorMsg.value = ''
     await channelsStore.inviteMember(channelsStore.currentChannelId, user.id)
     addedUserIds.value.add(user.id)
   } catch (err: unknown) {
-    const error = err as { response?: { status?: number, data?: { message?: string } } }
+    const error = err as { response?: { status?: number; data?: { message?: string } } }
     if (error.response?.status === 403) {
       errorMsg.value = 'Недостатньо прав для запрошення'
     } else {
       errorMsg.value = 'Помилка при додаванні учасника'
     }
+  }
+}
+
+async function inviteNewUser() {
+  if (!channelsStore.currentChannelId || !isValidEmail.value) return
+
+  loading.value = true
+  errorMsg.value = ''
+
+  try {
+    await inviteByEmail(query.value, channelsStore.currentChannelId)
+    invitedEmail.value = query.value
+  } catch (err: unknown) {
+    const error = err as { response?: { status?: number; data?: { message?: string } } }
+    if (error.response?.status === 422) {
+      errorMsg.value = 'Невірний email'
+    } else if (error.response?.status === 429) {
+      errorMsg.value = 'Забагато запрошень, спробуйте пізніше'
+    } else {
+      errorMsg.value = 'Помилка при надсиланні запрошення'
+    }
+  } finally {
+    loading.value = false
   }
 }
 
@@ -98,15 +129,26 @@ function onKeydown(e: KeyboardEvent) {
           aria-label="Пошук користувачів"
         />
       </div>
-      
+
       <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
-      
+
       <div class="results" role="listbox">
         <div v-if="loading" class="status-msg">Пошук...</div>
-        <div v-else-if="query && results.length === 0 && !errorMsg" class="status-msg">
-          Нікого не знайдено
+        <div v-else-if="invitedEmail" class="status-msg success">
+          <PhCheck :size="16" /> Запрошення надіслано
         </div>
-        
+        <div v-else-if="query && results.length === 0 && !errorMsg">
+          <div v-if="isValidEmail" class="invite-action" @click="inviteNewUser">
+            <div class="icon-wrapper">
+              <PhPaperPlaneTilt :size="20" />
+            </div>
+            <div class="invite-text">
+              Запросити <strong>{{ query }}</strong> у месенджер
+            </div>
+          </div>
+          <div v-else class="status-msg">Нікого не знайдено</div>
+        </div>
+
         <div
           v-for="user in results"
           :key="user.id"
@@ -283,5 +325,50 @@ function onKeydown(e: KeyboardEvent) {
   color: var(--success);
   font-size: var(--text-xs);
   font-weight: 500;
+}
+
+.invite-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  margin: var(--space-2);
+  border-radius: var(--radius-md);
+  background-color: var(--indigo-50);
+  color: var(--indigo-700);
+  cursor: pointer;
+  border: 1px solid var(--indigo-100);
+}
+
+[data-theme='dark'] .invite-action {
+  background-color: rgba(79, 70, 229, 0.1);
+  border-color: rgba(79, 70, 229, 0.2);
+  color: var(--indigo-300);
+}
+
+.invite-action:hover {
+  background-color: var(--indigo-100);
+}
+
+[data-theme='dark'] .invite-action:hover {
+  background-color: rgba(79, 70, 229, 0.2);
+}
+
+.icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.invite-text {
+  font-size: var(--text-sm);
+}
+
+.status-msg.success {
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
 }
 </style>

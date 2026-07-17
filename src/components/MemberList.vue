@@ -4,6 +4,7 @@ import { useChannelsStore } from '../stores/channels'
 import { usePresenceStore } from '../stores/presence'
 import { PhX, PhPlus } from '@phosphor-icons/vue'
 import AddMemberPopover from './AddMemberPopover.vue'
+import type { User } from '../types/User'
 
 const showAddMemberPopover = ref(false)
 const emit = defineEmits<{
@@ -34,16 +35,18 @@ const sortedMembers = computed(() => {
   })
 })
 
-function getPresenceClass(userId: number, baseStatus: string) {
-  const isOnline = presenceStore.isUserOnline(userId)
+function getPresenceClass(user: User) {
+  if (user.is_pending) return 'offline'
+  const isOnline = presenceStore.isUserOnline(user.id)
   if (!isOnline) return 'offline'
-  return baseStatus === 'away' ? 'away' : 'online'
+  return user.status === 'away' ? 'away' : 'online'
 }
 
-function getPresenceLabel(userId: number, baseStatus: string) {
-  const isOnline = presenceStore.isUserOnline(userId)
+function getPresenceLabel(user: User) {
+  if (user.is_pending) return 'запрошений'
+  const isOnline = presenceStore.isUserOnline(user.id)
   if (!isOnline) return 'офлайн'
-  return baseStatus === 'away' ? 'немає на місці' : 'у мережі'
+  return user.status === 'away' ? 'немає на місці' : 'у мережі'
 }
 </script>
 
@@ -77,14 +80,15 @@ function getPresenceLabel(userId: number, baseStatus: string) {
           <div class="member-avatar">
             {{ member.user.name.charAt(0) }}
             <span
-              :class="['presence-indicator', getPresenceClass(member.user.id, member.user.status)]"
-              :title="getPresenceLabel(member.user.id, member.user.status)"
+              :class="['presence-indicator', getPresenceClass(member.user)]"
+              :title="getPresenceLabel(member.user)"
             ></span>
           </div>
 
           <div class="member-info">
             <span class="member-name">{{ member.user.name }}</span>
-            <span v-if="member.role === 'owner'" class="member-role owner">власник</span>
+            <span v-if="member.user.is_pending" class="member-role pending">запрошений</span>
+            <span v-else-if="member.role === 'owner'" class="member-role owner">власник</span>
             <span v-else-if="member.role === 'admin'" class="member-role admin">адмін</span>
             <span class="member-email">{{ member.user.email }}</span>
           </div>
@@ -274,6 +278,16 @@ function getPresenceLabel(userId: number, baseStatus: string) {
   background-color: var(--gray-100);
   color: var(--text-secondary);
   border: 1px solid var(--border-strong);
+}
+
+.member-role.pending {
+  background-color: var(--gray-50);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-strong);
+}
+
+[data-theme='dark'] .member-role.pending {
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .member-email {

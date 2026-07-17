@@ -5,4 +5,5 @@ export interface User {
   avatar_url: string | null
   status: string
   last_seen_at: string | null
+  is_pending?: boolean
 }
