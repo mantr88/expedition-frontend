@@ -11,6 +11,7 @@ import {
 import type { Message } from '../types/Message'
 import { useAuthStore } from './auth'
 import { useChannelsStore } from './channels'
+import { generateUUID } from '../utils/uuid'
 
 interface MessagesState {
   messages: Record<number, Message[]>
@@ -125,7 +126,7 @@ export const useMessagesStore = defineStore('messages', {
       const authStore = useAuthStore()
       if (!authStore.user) throw new Error('Not authenticated')
 
-      const clientMsgId = crypto.randomUUID()
+      const clientMsgId = generateUUID()
 
       // Optimistic message
       const optimisticMessage: Message = {

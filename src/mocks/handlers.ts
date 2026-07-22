@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw'
 import type { User } from '../types/User'
 import type { Channel, ChannelMember } from '../types/Channel'
 import type { Message } from '../types/Message'
+import { generateUUID } from '../utils/uuid'
 
 const mockUsers: User[] = [
   {
@@ -104,7 +105,7 @@ function generateSeededMessages() {
 
       messages.push({
         id,
-        client_message_id: crypto.randomUUID(),
+        client_message_id: generateUUID(),
         channel_id: channelId,
         user,
         parent_id: null,
