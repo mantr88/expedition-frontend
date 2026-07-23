@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, type ComponentPublicInstance } from 'vue'
 
 const emit = defineEmits<{
   (e: 'select', emoji: string): void
