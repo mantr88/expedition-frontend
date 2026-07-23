@@ -79,6 +79,9 @@ watch(
     if (newChanId !== null) {
       try {
         await messagesStore.loadMessages(newChanId)
+        if (!channelsStore.members[newChanId]) {
+          await channelsStore.loadChannelMembers(newChanId)
+        }
         const msgs = messagesStore.messages[newChanId]
         if (msgs && msgs.length > 0) {
           const maxId = Math.max(...msgs.map((m) => m.id))

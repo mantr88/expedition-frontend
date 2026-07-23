@@ -8,7 +8,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'toggle', emoji: string): void
-  (e: 'add-reaction'): void
+  (e: 'add-reaction', event: MouseEvent): void
 }>()
 </script>
 
@@ -23,7 +23,7 @@ const emit = defineEmits<{
       <span class="emoji">{{ reaction.emoji }}</span>
       <span class="count mono">{{ reaction.count }}</span>
     </button>
-    <button class="add-reaction-btn" @click="emit('add-reaction')">
+    <button class="add-reaction-btn" @click="emit('add-reaction', $event)">
       <PhSmiley :size="16" />
     </button>
   </div>

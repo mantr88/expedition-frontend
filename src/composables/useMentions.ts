@@ -13,6 +13,10 @@ export function useMentions() {
   const mentionSuggestions = computed<User[]>(() => {
     if (!isMentioning.value) return []
 
+    if (channelsStore.currentChannelId && !channelsStore.members[channelsStore.currentChannelId]) {
+      channelsStore.loadChannelMembers(channelsStore.currentChannelId)
+    }
+
     const members = channelsStore.activeChannelMembers.map((m) => m.user)
     const query = mentionQuery.value.toLowerCase()
 

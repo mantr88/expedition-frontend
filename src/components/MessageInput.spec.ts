@@ -56,4 +56,23 @@ describe('MessageInput', () => {
 
     expect(wrapper.emitted('send')).toBeFalsy()
   })
+
+  it('inserts @ and opens mentions popup when clicking @ toolbar button', async () => {
+    const wrapper = mount(MessageInput)
+    const atBtn = wrapper.find('button[aria-label="Згадати когось"]')
+    await atBtn.trigger('click')
+
+    const textarea = wrapper.find('textarea')
+    expect(textarea.element.value).toContain('@')
+    expect(document.querySelector('.mentions-popup')).not.toBeNull()
+  })
+
+  it('toggles emoji picker popup when clicking smiley toolbar button', async () => {
+    const wrapper = mount(MessageInput)
+    const smileyBtn = wrapper.find('button[aria-label="Додати емодзі"]')
+
+    expect(document.querySelector('.emoji-picker-popup')).toBeNull()
+    await smileyBtn.trigger('click')
+    expect(document.querySelector('.emoji-picker-popup')).not.toBeNull()
+  })
 })

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { PhPaperPlaneTilt, PhPaperclip, PhSmiley, PhAt, PhFile, PhX } from '@phosphor-icons/vue'
 import { useMentions } from '../composables/useMentions'
+import EmojiPicker from './EmojiPicker.vue'
 import type { User } from '../types/User'
 
 const props = defineProps<{
@@ -18,6 +19,17 @@ const text = ref('')
 const files = ref<File[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const showEmojiPicker = ref(false)
+const emojiPickerWrapperRef = ref<HTMLElement | null>(null)
+
+// --- Cursor position tracking ---
+const lastCursorPos = ref(0)
+
+function saveCursorPos() {
+  if (textareaRef.value) {
+    lastCursorPos.value = textareaRef.value.selectionStart
+  }
+}
 
 const ALLOWED_EXTENSIONS = [
   'jpeg',
@@ -87,16 +99,16 @@ function onPaste(e: ClipboardEvent) {
 }
 
 function handleKeyDown(e: KeyboardEvent) {
-  if (isMentioning.value && mentionSuggestions.value.length > 0) {
-    if (e.key === 'ArrowUp') {
+  if (isMentioning.value) {
+    if (e.key === 'ArrowUp' && mentionSuggestions.value.length > 0) {
       e.preventDefault()
       navigateMentions(-1)
       return
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === 'ArrowDown' && mentionSuggestions.value.length > 0) {
       e.preventDefault()
       navigateMentions(1)
       return
-    } else if (e.key === 'Enter' && !e.shiftKey) {
+    } else if (e.key === 'Enter' && !e.shiftKey && mentionSuggestions.value.length > 0) {
       e.preventDefault()
       selectMention(mentionSuggestions.value[selectedMentionIndex.value])
       return
@@ -118,6 +130,9 @@ function onTextareaInput() {
   emit('typing')
   if (textareaRef.value) {
     processMentionsInput(text.value, textareaRef.value.selectionStart)
+    if (isMentioning.value) {
+      updateMentionsPopupPosition()
+    }
   }
 }
 
@@ -136,7 +151,173 @@ function submit() {
   text.value = ''
   files.value = []
   isMentioning.value = false
+  showEmojiPicker.value = false
 }
+
+const mentionsPopupStyle = ref<Record<string, string>>({})
+
+function updateMentionsPopupPosition() {
+  const container = textareaRef.value || (document.querySelector('.input-wrapper') as HTMLElement)
+  if (container) {
+    const rect = container.getBoundingClientRect()
+    const isMobile = window.innerWidth <= 480
+    if (isMobile) {
+      mentionsPopupStyle.value = {
+        position: 'fixed',
+        bottom: `${Math.max(10, window.innerHeight - rect.top + 8)}px`,
+        left: '12px',
+        right: '12px',
+        maxWidth: 'calc(100vw - 24px)',
+        zIndex: '9999',
+      }
+    } else {
+      mentionsPopupStyle.value = {
+        position: 'fixed',
+        bottom: `${window.innerHeight - rect.top + 8}px`,
+        left: `${Math.max(12, rect.left)}px`,
+        zIndex: '9999',
+      }
+    }
+  }
+}
+
+// --- @ button handler ---
+function insertAtSymbol() {
+  if (props.disabled) return
+
+  const textarea = textareaRef.value
+  const pos = textarea ? textarea.selectionStart : text.value.length
+
+  // Insert @ at cursor position, preceded by space if needed
+  const before = text.value.slice(0, pos)
+  const after = text.value.slice(pos)
+  const needsSpace = before.length > 0 && before[before.length - 1] !== ' ' && before[before.length - 1] !== '\n'
+  const insert = (needsSpace ? ' ' : '') + '@'
+  text.value = before + insert + after
+
+  const newPos = pos + insert.length
+  lastCursorPos.value = newPos
+
+  // Immediately activate mention logic synchronously
+  processMentionsInput(text.value, newPos)
+  updateMentionsPopupPosition()
+
+  nextTick(() => {
+    if (textarea) {
+      textarea.focus()
+      textarea.setSelectionRange(newPos, newPos)
+      processMentionsInput(text.value, newPos)
+      updateMentionsPopupPosition()
+    }
+  })
+}
+
+const emojiPickerStyle = ref<Record<string, string>>({})
+
+// --- Emoji picker handlers ---
+function toggleEmojiPicker(e?: MouseEvent) {
+  if (props.disabled) return
+  saveCursorPos()
+
+  if (!showEmojiPicker.value) {
+    const target = (e?.currentTarget as HTMLElement) || textareaRef.value
+    if (target) {
+      const rect = target.getBoundingClientRect()
+      const isMobile = window.innerWidth <= 480
+      if (isMobile) {
+        emojiPickerStyle.value = {
+          position: 'fixed',
+          bottom: `${Math.max(10, window.innerHeight - rect.top + 8)}px`,
+          left: '12px',
+          right: '12px',
+          maxWidth: 'calc(100vw - 24px)',
+          zIndex: '9999',
+        }
+      } else {
+        const left = Math.min(rect.left, window.innerWidth - 364)
+        emojiPickerStyle.value = {
+          position: 'fixed',
+          bottom: `${window.innerHeight - rect.top + 8}px`,
+          left: `${Math.max(12, left)}px`,
+          zIndex: '9999',
+        }
+      }
+    }
+    showEmojiPicker.value = true
+  } else {
+    showEmojiPicker.value = false
+  }
+}
+
+function insertEmoji(emoji: string) {
+  const pos = lastCursorPos.value
+  const before = text.value.slice(0, pos)
+  const after = text.value.slice(pos)
+  text.value = before + emoji + after
+
+  const newPos = pos + emoji.length
+  lastCursorPos.value = newPos
+
+  nextTick(() => {
+    if (textareaRef.value) {
+      textareaRef.value.focus()
+      textareaRef.value.setSelectionRange(newPos, newPos)
+    }
+  })
+}
+
+function closeEmojiPicker() {
+  showEmojiPicker.value = false
+}
+
+function emojiClickOutsideHandler(event: MouseEvent) {
+  const wrapper = emojiPickerWrapperRef.value
+  if (wrapper && !wrapper.contains(event.target as Node)) {
+    showEmojiPicker.value = false
+  }
+}
+
+function mentionsClickOutsideHandler(event: MouseEvent) {
+  if (!isMentioning.value) return
+  const popupEl = document.querySelector('.mentions-popup')
+  const textareaEl = textareaRef.value
+  if (
+    popupEl &&
+    !popupEl.contains(event.target as Node) &&
+    textareaEl &&
+    !textareaEl.contains(event.target as Node)
+  ) {
+    isMentioning.value = false
+  }
+}
+
+watch(isMentioning, (isOpen) => {
+  if (isOpen) {
+    nextTick(() => {
+      updateMentionsPopupPosition()
+    })
+    setTimeout(() => {
+      document.addEventListener('click', mentionsClickOutsideHandler)
+    }, 0)
+  } else {
+    document.removeEventListener('click', mentionsClickOutsideHandler)
+  }
+})
+
+watch(showEmojiPicker, (isOpen) => {
+  if (isOpen) {
+    setTimeout(() => {
+      document.addEventListener('click', emojiClickOutsideHandler)
+    }, 0)
+  } else {
+    document.removeEventListener('click', emojiClickOutsideHandler)
+  }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', emojiClickOutsideHandler)
+  document.removeEventListener('click', mentionsClickOutsideHandler)
+})
 
 function openFileDialog() {
   fileInputRef.value?.click()
@@ -155,17 +336,40 @@ function getObjectURL(file: File) {
   <div class="message-input-container">
     <div class="input-wrapper" @drop.prevent="onDrop" @dragover.prevent>
       <!-- Mentions Popup -->
-      <div v-if="isMentioning && mentionSuggestions.length > 0" class="mentions-popup">
-        <div
-          v-for="(user, idx) in mentionSuggestions"
-          :key="user.id"
-          :class="['mention-item', { active: idx === selectedMentionIndex }]"
-          @click="selectMention(user)"
-        >
-          <div class="user-avatar-placeholder sm">{{ user.name.charAt(0) }}</div>
-          <span class="mention-name">{{ user.name }}</span>
+      <Teleport to="body">
+        <div v-if="isMentioning" class="mentions-popup" :style="mentionsPopupStyle">
+          <template v-if="mentionSuggestions.length > 0">
+            <div
+              v-for="(user, idx) in mentionSuggestions"
+              :key="user.id"
+              :class="['mention-item', { active: idx === selectedMentionIndex }]"
+              @click="selectMention(user)"
+            >
+              <div class="user-avatar-placeholder sm">{{ user.name.charAt(0) }}</div>
+              <span class="mention-name">{{ user.name }}</span>
+            </div>
+            <div class="mentions-footer">
+              <span>↑↓ навігація</span>
+              <span>↵ обрати</span>
+              <span>esc закрити</span>
+            </div>
+          </template>
+          <div v-else class="mentions-empty">Нічого не знайдено</div>
         </div>
-      </div>
+      </Teleport>
+
+      <!-- Emoji Picker Popup -->
+      <Teleport to="body">
+        <div
+          v-if="showEmojiPicker"
+          ref="emojiPickerWrapperRef"
+          class="emoji-picker-popup"
+          :style="emojiPickerStyle"
+          @click.stop
+        >
+          <EmojiPicker @select="insertEmoji" @close="closeEmojiPicker" />
+        </div>
+      </Teleport>
 
       <input
         type="file"
@@ -202,6 +406,7 @@ function getObjectURL(file: File) {
         @click="onTextareaInput"
         @keyup="onTextareaInput"
         @paste="onPaste"
+        @blur="saveCursorPos"
       ></textarea>
 
       <div class="toolbar">
@@ -215,10 +420,22 @@ function getObjectURL(file: File) {
           >
             <PhPaperclip :size="20" />
           </button>
-          <button class="tool-btn" type="button" aria-label="Додати емодзі" :disabled="disabled">
+          <button
+            :class="['tool-btn', { 'tool-btn-active': showEmojiPicker }]"
+            type="button"
+            aria-label="Додати емодзі"
+            :disabled="disabled"
+            @click.stop="toggleEmojiPicker($event)"
+          >
             <PhSmiley :size="20" />
           </button>
-          <button class="tool-btn" type="button" aria-label="Згадати когось" :disabled="disabled">
+          <button
+            class="tool-btn"
+            type="button"
+            aria-label="Згадати когось"
+            :disabled="disabled"
+            @click="insertAtSymbol"
+          >
             <PhAt :size="20" />
           </button>
         </div>
@@ -411,17 +628,15 @@ function getObjectURL(file: File) {
 }
 
 .mentions-popup {
-  position: absolute;
-  bottom: calc(100% + var(--space-2));
-  left: 0;
+  position: relative;
   background-color: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popover);
-  max-height: 200px;
+  max-height: 240px;
   overflow-y: auto;
-  z-index: 50;
-  min-width: 200px;
+  z-index: 9999;
+  min-width: 240px;
 }
 
 .mention-item {
@@ -457,6 +672,26 @@ function getObjectURL(file: File) {
   color: var(--text-primary);
 }
 
+.mentions-footer {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-muted);
+  background-color: #fff;
+}
+
+.mentions-empty {
+  padding: var(--space-3) var(--space-4);
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .user-avatar-placeholder.sm {
   width: 20px;
   height: 20px;
@@ -469,5 +704,15 @@ function getObjectURL(file: File) {
   justify-content: center;
   font-weight: 500;
   text-transform: uppercase;
+}
+
+/* Emoji picker popup */
+.emoji-picker-popup {
+  z-index: 9999;
+}
+
+.tool-btn-active {
+  background-color: var(--bg-active);
+  color: var(--text-primary);
 }
 </style>

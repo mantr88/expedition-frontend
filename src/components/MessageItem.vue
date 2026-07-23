@@ -88,12 +88,55 @@ function handleDelete() {
   }
 }
 
-function handleAddReaction() {
-  showEmojiPicker.value = !showEmojiPicker.value
+const pickerElRef = ref<HTMLElement | null>(null)
+const pickerStyle = ref<Record<string, string>>({})
+
+function handleAddReaction(event?: MouseEvent) {
+  if (!showEmojiPicker.value) {
+    const target = event?.currentTarget as HTMLElement | null
+    const rect = target ? target.getBoundingClientRect() : wrapperRef.value?.getBoundingClientRect()
+    const isMobile = window.innerWidth <= 480
+
+    if (rect) {
+      const pickerHeight = 360
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+
+      let top: number
+      if (spaceBelow < pickerHeight && spaceAbove > spaceBelow) {
+        top = Math.max(10, rect.top - pickerHeight - 4)
+      } else {
+        top = Math.min(window.innerHeight - pickerHeight - 10, rect.bottom + 4)
+      }
+
+      if (isMobile) {
+        pickerStyle.value = {
+          position: 'fixed',
+          top: `${top}px`,
+          left: '12px',
+          right: '12px',
+          maxWidth: 'calc(100vw - 24px)',
+          zIndex: '9999',
+        }
+      } else {
+        const right = Math.max(12, window.innerWidth - rect.right)
+        pickerStyle.value = {
+          position: 'fixed',
+          top: `${top}px`,
+          right: `${right}px`,
+          zIndex: '9999',
+        }
+      }
+    }
+
+    showEmojiPicker.value = true
+  } else {
+    showEmojiPicker.value = false
+  }
 }
 
 function clickOutsideHandler(event: MouseEvent) {
-  const pickerEl = wrapperRef.value?.querySelector('.emoji-picker-wrapper')
+  const pickerEl = pickerElRef.value
   if (pickerEl && !pickerEl.contains(event.target as Node)) {
     showEmojiPicker.value = false
   }
@@ -101,7 +144,6 @@ function clickOutsideHandler(event: MouseEvent) {
 
 watch(showEmojiPicker, (isOpen) => {
   if (isOpen) {
-    // Use capture or setTimeout to avoid immediate trigger during the click that opens it
     setTimeout(() => {
       document.addEventListener('click', clickOutsideHandler)
     }, 0)
@@ -185,7 +227,7 @@ function openThread() {
           v-if="message.reactions"
           :reactions="message.reactions"
           @toggle="toggleReaction"
-          @add-reaction="handleAddReaction"
+          @add-reaction="handleAddReaction($event)"
         />
 
         <!-- Thread replies indicator -->
@@ -207,7 +249,7 @@ function openThread() {
 
     <!-- Floating Actions Toolbar -->
     <div v-if="!message.deleted_at && !isEditing" class="floating-actions">
-      <button class="action-btn" aria-label="Додати реакцію" @click.stop="handleAddReaction">
+      <button class="action-btn" aria-label="Додати реакцію" @click.stop="handleAddReaction($event)">
         <PhSmiley :size="18" />
       </button>
       <button class="action-btn" aria-label="Відповісти в треді" @click.stop="openThread">
@@ -222,9 +264,17 @@ function openThread() {
     </div>
 
     <!-- Emoji Picker Popover -->
-    <div v-if="showEmojiPicker" class="emoji-picker-wrapper" @click.stop>
-      <EmojiPicker @select="selectEmoji" />
-    </div>
+    <Teleport to="body">
+      <div
+        v-if="showEmojiPicker"
+        ref="pickerElRef"
+        class="emoji-picker-wrapper"
+        :style="pickerStyle"
+        @click.stop
+      >
+        <EmojiPicker @select="selectEmoji" />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -241,7 +291,7 @@ function openThread() {
 }
 
 .message-item-wrapper.picker-open {
-  z-index: 50;
+  z-index: 100;
 }
 
 .message-item-wrapper.picker-open .floating-actions {
@@ -537,8 +587,7 @@ function openThread() {
 .emoji-picker-wrapper {
   position: absolute;
   right: var(--space-4);
-  top: 12%;
-  margin-top: 4px;
-  z-index: 50;
+  top: 16px;
+  z-index: 100;
 }
 </style>

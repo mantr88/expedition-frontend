@@ -99,7 +99,7 @@ async function handleSubmit() {
         <span v-else>Увійти</span>
       </button>
 
-      <div class="footer">v0.x</div>
+      <div class="footer">v0.0.1</div>
     </form>
   </div>
 </template>
