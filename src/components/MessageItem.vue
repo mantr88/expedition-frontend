@@ -249,7 +249,11 @@ function openThread() {
 
     <!-- Floating Actions Toolbar -->
     <div v-if="!message.deleted_at && !isEditing" class="floating-actions">
-      <button class="action-btn" aria-label="Додати реакцію" @click.stop="handleAddReaction($event)">
+      <button
+        class="action-btn"
+        aria-label="Додати реакцію"
+        @click.stop="handleAddReaction($event)"
+      >
         <PhSmiley :size="18" />
       </button>
       <button class="action-btn" aria-label="Відповісти в треді" @click.stop="openThread">

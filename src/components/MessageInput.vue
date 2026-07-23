@@ -191,7 +191,8 @@ function insertAtSymbol() {
   // Insert @ at cursor position, preceded by space if needed
   const before = text.value.slice(0, pos)
   const after = text.value.slice(pos)
-  const needsSpace = before.length > 0 && before[before.length - 1] !== ' ' && before[before.length - 1] !== '\n'
+  const needsSpace =
+    before.length > 0 && before[before.length - 1] !== ' ' && before[before.length - 1] !== '\n'
   const insert = (needsSpace ? ' ' : '') + '@'
   text.value = before + insert + after
 
