@@ -4,6 +4,7 @@ export interface Reaction {
   emoji: string
   count: number
   reacted_by_me: boolean
+  users?: string[]
 }
 
 export interface Attachment {

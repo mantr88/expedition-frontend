@@ -45,8 +45,14 @@ export const useChannelsStore = defineStore('channels', {
       try {
         const data = await fetchChannels()
         this.channels = data
-        if (data.length > 0 && this.currentChannelId === null) {
-          await this.selectChannel(data[0].id)
+        
+        if (this.currentChannelId === null) {
+          const savedId = localStorage.getItem('last_channel_id')
+          if (savedId && data.some((c) => c.id === Number(savedId))) {
+            await this.selectChannel(Number(savedId))
+          } else if (data.length > 0) {
+            await this.selectChannel(data[0].id)
+          }
         }
       } catch (err) {
         this.error = 'Не вдалося завантажити канали.'
@@ -58,6 +64,7 @@ export const useChannelsStore = defineStore('channels', {
 
     async selectChannel(channelId: number) {
       this.currentChannelId = channelId
+      localStorage.setItem('last_channel_id', channelId.toString())
       if (!this.members[channelId]) {
         await this.loadChannelMembers(channelId)
       }

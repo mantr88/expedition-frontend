@@ -55,12 +55,16 @@ export const useMessagesStore = defineStore('messages', {
         const before = options.loadMore && pag ? (pag.nextCursor ?? undefined) : undefined
         const result = await fetchMessages(channelId, { before, limit: 50 })
 
+        const fetchedMsgs = [...result.data].sort((a, b) => a.id - b.id)
         const currentMsgs = this.messages[channelId] ?? []
 
         if (options.loadMore) {
-          this.messages[channelId] = [...result.data, ...currentMsgs]
+          const merged = [...fetchedMsgs, ...currentMsgs]
+          const uniqueMap = new Map<number, Message>()
+          merged.forEach((m) => uniqueMap.set(m.id, m))
+          this.messages[channelId] = Array.from(uniqueMap.values()).sort((a, b) => a.id - b.id)
         } else {
-          this.messages[channelId] = result.data
+          this.messages[channelId] = fetchedMsgs
         }
 
         this.pagination[channelId] = {
@@ -99,10 +103,15 @@ export const useMessagesStore = defineStore('messages', {
         const after = options.loadMore && pag ? (pag.nextCursor ?? undefined) : undefined
         const result = await apiFetchReplies(messageId, { after, limit: 50 })
 
+        const fetchedReplies = [...result.data].sort((a, b) => a.id - b.id)
+
         if (options.loadMore) {
-          this.threadReplies = [...this.threadReplies, ...result.data]
+          const merged = [...this.threadReplies, ...fetchedReplies]
+          const uniqueMap = new Map<number, Message>()
+          merged.forEach((m) => uniqueMap.set(m.id, m))
+          this.threadReplies = Array.from(uniqueMap.values()).sort((a, b) => a.id - b.id)
         } else {
-          this.threadReplies = result.data
+          this.threadReplies = fetchedReplies
         }
 
         this.threadPagination = {
@@ -126,17 +135,18 @@ export const useMessagesStore = defineStore('messages', {
       const authStore = useAuthStore()
       if (!authStore.user) throw new Error('Not authenticated')
 
+      const finalBody = body.trim() || (files.length > 0 ? ' ' : body)
       const clientMsgId = generateUUID()
 
       // Optimistic message
       const optimisticMessage: Message = {
-        id: -Date.now(),
+        id: Date.now(),
         client_message_id: clientMsgId,
         channel_id: channelId,
         user: authStore.user,
         parent_id: parentId,
-        body_raw: body,
-        body_html: body,
+        body_raw: finalBody,
+        body_html: finalBody,
         type: files.length > 0 ? 'file' : 'text',
         edited_at: null,
         deleted_at: null,
@@ -159,7 +169,7 @@ export const useMessagesStore = defineStore('messages', {
 
       try {
         const realMessage = await apiSendMessage(channelId, {
-          body,
+          body: finalBody,
           client_message_id: clientMsgId,
           parent_id: parentId,
         })
@@ -206,22 +216,39 @@ export const useMessagesStore = defineStore('messages', {
       const msg = this.findMessageAnywhere(channelId, messageId)
       if (!msg) return
 
+      const authStore = useAuthStore()
+      const userName = authStore.user?.name
+
       const reaction = msg.reactions.find((r) => r.emoji === emoji)
-      const previousState = reaction ? { ...reaction } : null
+      const previousState = reaction ? { ...reaction, users: reaction.users ? [...reaction.users] : [] } : null
 
       if (reaction) {
         if (reaction.reacted_by_me) {
           reaction.count = Math.max(0, reaction.count - 1)
           reaction.reacted_by_me = false
+          if (userName) {
+            reaction.users = (reaction.users || []).filter((u) => u !== userName)
+          }
           if (reaction.count === 0) {
             msg.reactions = msg.reactions.filter((r) => r.emoji !== emoji)
           }
         } else {
           reaction.count++
           reaction.reacted_by_me = true
+          if (userName) {
+            reaction.users = reaction.users || []
+            if (!reaction.users.includes(userName)) {
+              reaction.users.push(userName)
+            }
+          }
         }
       } else {
-        msg.reactions.push({ emoji, count: 1, reacted_by_me: true })
+        msg.reactions.push({
+          emoji,
+          count: 1,
+          reacted_by_me: true,
+          users: userName ? [userName] : [],
+        })
       }
 
       try {
@@ -230,15 +257,16 @@ export const useMessagesStore = defineStore('messages', {
         if (currentMsg) {
           const idx = currentMsg.reactions.findIndex((r) => r.emoji === emoji)
           if (result.count > 0) {
-            const updatedReaction = {
-              emoji,
-              count: result.count,
-              reacted_by_me: result.action === 'added',
-            }
             if (idx !== -1) {
-              currentMsg.reactions[idx] = updatedReaction
+              currentMsg.reactions[idx].count = result.count
+              currentMsg.reactions[idx].reacted_by_me = result.action === 'added'
             } else {
-              currentMsg.reactions.push(updatedReaction)
+              currentMsg.reactions.push({
+                emoji,
+                count: result.count,
+                reacted_by_me: result.action === 'added',
+                users: userName ? [userName] : [],
+              })
             }
           } else if (idx !== -1) {
             currentMsg.reactions.splice(idx, 1)

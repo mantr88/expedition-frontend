@@ -115,7 +115,7 @@ function generateSeededMessages() {
         edited_at: null,
         deleted_at: null,
         created_at: new Date(baseTime + i * 60 * 1000).toISOString(),
-        reactions: [],
+        reactions: i % 3 === 0 ? [{ emoji: '👍', count: 2, reacted_by_me: true, users: ['Anna Petrenko', 'Ihor Franko'] }] : [],
         attachments: [],
         reply_count: 0,
         last_reply_at: null,

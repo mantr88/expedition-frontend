@@ -18,6 +18,7 @@ const emit = defineEmits<{
       v-for="reaction in reactions"
       :key="reaction.emoji"
       :class="['reaction-pill', { 'reacted-by-me': reaction.reacted_by_me }]"
+      :title="reaction.users?.join(', ') || ''"
       @click="emit('toggle', reaction.emoji)"
     >
       <span class="emoji">{{ reaction.emoji }}</span>
