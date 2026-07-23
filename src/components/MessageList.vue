@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onUnmounted } from 'vue'
-import { VList } from 'virtua/vue'
+import { VList, type VListHandle } from 'virtua/vue'
 import type { Message } from '../types/Message'
 import MessageItem from './MessageItem.vue'
 import { useInfiniteScroll } from '../composables/useInfiniteScroll'
@@ -19,10 +19,7 @@ const emit = defineEmits<{
   (e: 'delete', messageId: number): void
 }>()
 
-const vListRef = ref<null | {
-  scrollElement?: HTMLElement
-  scrollToIndex?: (index: number) => void
-}>(null)
+const vListRef = ref<null | (VListHandle & { scrollElement?: HTMLElement })>(null)
 const { handleScrollUp } = useInfiniteScroll()
 
 const channelsStore = useChannelsStore()
@@ -68,6 +65,8 @@ function checkConsecutive(msg: Message, index: number) {
   return timeDiff < 120000 // 2 minutes
 }
 
+let prevFirstId: number | null = null
+
 function scrollToBottom() {
   nextTick(() => {
     if (
@@ -75,28 +74,46 @@ function scrollToBottom() {
       typeof vListRef.value.scrollToIndex === 'function' &&
       props.messages.length > 0
     ) {
-      vListRef.value.scrollToIndex(props.messages.length - 1)
+      vListRef.value.scrollToIndex(props.messages.length - 1, { align: 'end' })
     }
   })
 }
 
+defineExpose({
+  scrollToBottom,
+})
+
 // Watch messages changes to trigger scroll to bottom when loading new channel or sending message
 watch(
-  () => props.messages,
-  (newMsgs, oldMsgs) => {
-    if (!newMsgs || newMsgs.length === 0) return
-    if (messagesStore.highlightMessageId !== null) return
+  [() => props.messages, () => props.messages.length],
+  ([newMsgs, newLen], [oldMsgs, oldLen]) => {
+    if (!newMsgs || newMsgs.length === 0) {
+      prevFirstId = null
+      return
+    }
 
-    // If channel changed or we sent a message (first message ID is same)
-    if (
-      !oldMsgs ||
-      oldMsgs.length === 0 ||
-      (newMsgs.length > oldMsgs.length && newMsgs[0]?.id === oldMsgs[0]?.id)
-    ) {
+    if (messagesStore.highlightMessageId !== null) {
+      prevFirstId = newMsgs[0]?.id ?? null
+      return
+    }
+
+    const firstId = newMsgs[0]?.id ?? null
+
+    // If channel changed (different messages array reference or first load)
+    if (newMsgs !== oldMsgs || !oldLen || oldLen === 0) {
+      prevFirstId = firstId
+      scrollToBottom()
+      return
+    }
+
+    // If messages were added at the bottom (length increased and first message ID remained same)
+    if (newLen > oldLen && firstId === prevFirstId) {
       scrollToBottom()
     }
+
+    prevFirstId = firstId
   },
-  { immediate: true, deep: false },
+  { immediate: true },
 )
 
 function onScroll() {

@@ -18,11 +18,18 @@ afterAll(() => {
   vi.unstubAllGlobals()
 })
 
+const mockScrollToIndex = vi.fn()
+
 vi.mock('virtua/vue', () => {
   return {
     VList: {
       name: 'VList',
       props: ['data'],
+      methods: {
+        scrollToIndex(...args: unknown[]) {
+          mockScrollToIndex(...args)
+        },
+      },
       template: `
         <div class="vlist-stub">
           <slot v-for="(item, index) in data" :item="item" :index="index" />
@@ -83,6 +90,7 @@ describe('MessageList', () => {
     setActivePinia(createPinia())
     const authStore = useAuthStore()
     authStore.user = mockUser
+    mockScrollToIndex.mockClear()
   })
 
   it('renders loading state when loading and empty', () => {
@@ -121,5 +129,17 @@ describe('MessageList', () => {
 
     expect(items[0].find('.user-avatar').exists()).toBe(true)
     expect(items[1].find('.user-avatar').exists()).toBe(false)
+  })
+
+  it('scrolls to bottom with align end when messages are provided', async () => {
+    mount(MessageList, {
+      props: {
+        messages: mockMessages,
+        loading: false,
+      },
+    })
+
+    await new Promise((r) => setTimeout(r, 10))
+    expect(mockScrollToIndex).toHaveBeenCalledWith(1, { align: 'end' })
   })
 })
