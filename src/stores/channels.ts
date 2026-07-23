@@ -45,7 +45,7 @@ export const useChannelsStore = defineStore('channels', {
       try {
         const data = await fetchChannels()
         this.channels = data
-        
+
         if (this.currentChannelId === null) {
           const savedId = localStorage.getItem('last_channel_id')
           if (savedId && data.some((c) => c.id === Number(savedId))) {

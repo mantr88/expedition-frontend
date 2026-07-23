@@ -220,7 +220,9 @@ export const useMessagesStore = defineStore('messages', {
       const userName = authStore.user?.name
 
       const reaction = msg.reactions.find((r) => r.emoji === emoji)
-      const previousState = reaction ? { ...reaction, users: reaction.users ? [...reaction.users] : [] } : null
+      const previousState = reaction
+        ? { ...reaction, users: reaction.users ? [...reaction.users] : [] }
+        : null
 
       if (reaction) {
         if (reaction.reacted_by_me) {
